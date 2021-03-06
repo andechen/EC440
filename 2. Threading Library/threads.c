@@ -32,8 +32,7 @@
 
 /* thread_status identifies the current state of a thread. You can add, rename,
  * or delete these values. This is only a suggestion. */
-enum thread_status
-{
+enum thread_status{
 	TS_EXITED,
 	TS_RUNNING,
 	TS_READY,
@@ -42,7 +41,7 @@ enum thread_status
 };
 
 // The thread control block stores information about a thread. 
-struct thread_control_block {
+struct thread_control_block{
 	pthread_t tid;
 	void *stack;
 	jmp_buf regs;
@@ -67,8 +66,7 @@ void pthread_function_return_save(){
 }
 
 // Schedule the thread execution using Round Robin 
-static void schedule()
-{
+static void schedule(){
 	// Set current thread to TS_READY
 	switch(TCB_Table[global_tid].status){
 		case TS_RUNNING	:
@@ -117,8 +115,7 @@ static void schedule()
 }
 
 // Initialising threads after the first call of pthread_create
-static void scheduler_init()
-{
+static void scheduler_init(){
 	// Initialise all threads as TS_EMPTY
 	for(int i = 0; i < MAX_THREADS; i++){
 		TCB_Table[i].status = TS_EMPTY;
@@ -141,8 +138,7 @@ static void scheduler_init()
 // Creating a thread
 int pthread_create(
 	pthread_t *thread, const pthread_attr_t *attr,
-	void *(*start_routine) (void *), void *arg)
-{
+	void *(*start_routine) (void *), void *arg){
 	// Create the timer and handler for the scheduler. Create thread 0.
 	static bool is_first_call = true;
 	int main_thread = 0;
@@ -216,8 +212,7 @@ int pthread_create(
 }
 
 // Exit the thread
-void pthread_exit(void *value_ptr)
-{
+void pthread_exit(void *value_ptr){
 	// Status -> TS_EXITED
 	TCB_Table[global_tid].status = TS_EXITED;
 
