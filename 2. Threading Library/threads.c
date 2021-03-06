@@ -258,7 +258,6 @@ void pthread_exit(void *value_ptr)
 }
 
 // ID of the current thread
-pthread_t pthread_self(void)
-{
+pthread_t pthread_self(void){
 	return global_tid;
 }
