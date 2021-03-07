@@ -46,8 +46,6 @@ struct thread_control_block{
 	void *stack;
 	jmp_buf regs;
 	enum thread_status status;
-	void* exit_status;
-	int created;
 };
 
 // Define global variables
@@ -80,9 +78,8 @@ static void schedule(){
 	}
 
 	// Finding the next thread to schedule
-	int thread_found = 0;
 	pthread_t current_tid = global_tid;
-	while(!thread_found){
+	while(1){
 		if(current_tid == MAX_THREADS - 1){
 			current_tid = 0;
 		}
@@ -92,18 +89,14 @@ static void schedule(){
 
 		// If the found thread's state is TS_READY, break the loop
 		if(TCB_Table[current_tid].status == TS_READY){
-			thread_found = 1;
+			break;
 		}
 	}
 
 	int jump = 0;
-	// If the thread has been created and has not exited, save its state
-	if((TCB_Table[global_tid].created == 0) && (TCB_Table[global_tid].status != TS_EXITED)){
+	// If the thread has not exited, save its state
+	if(TCB_Table[global_tid].status != TS_EXITED){
 		jump = setjmp(TCB_Table[global_tid].regs);
-	}
-
-	if(TCB_Table[current_tid].created){
-		TCB_Table[current_tid].created = 0;
 	}
 
 	// Run the next thread
@@ -120,7 +113,6 @@ static void scheduler_init(){
 	for(int i = 0; i < MAX_THREADS; i++){
 		TCB_Table[i].status = TS_EMPTY;
 		TCB_Table[i].tid = i;
-		TCB_Table[i].created = 0;
 	}
 
 	// Setup the scheduler to SIGALRM at a specified interval
@@ -138,7 +130,8 @@ static void scheduler_init(){
 // Creating a thread
 int pthread_create(
 	pthread_t *thread, const pthread_attr_t *attr,
-	void *(*start_routine) (void *), void *arg){
+	void *(*start_routine) (void *), void *arg)
+{
 	// Create the timer and handler for the scheduler. Create thread 0.
 	static bool is_first_call = true;
 	int main_thread = 0;
@@ -147,9 +140,7 @@ int pthread_create(
 	if (is_first_call){
 		scheduler_init();
 		is_first_call = false;
-		
 		TCB_Table[0].status = TS_READY;
-		TCB_Table[0].created = 1;
 		main_thread = setjmp(TCB_Table[0].regs);
 	}
 
@@ -194,9 +185,6 @@ int pthread_create(
 
 		// Status -> TS_READY
         TCB_Table[current_tid].status = TS_READY;
-        
-		// Created a thread, used in schedule()
-        TCB_Table[current_tid].created = 1;
 
 		// Set the tid
         TCB_Table[current_tid].tid = current_tid;
@@ -215,8 +203,6 @@ int pthread_create(
 void pthread_exit(void *value_ptr){
 	// Status -> TS_EXITED
 	TCB_Table[global_tid].status = TS_EXITED;
-
-	TCB_Table[global_tid].exit_status = value_ptr;
 
 	// Wait...
 	pthread_t tid = TCB_Table[global_tid].tid;
