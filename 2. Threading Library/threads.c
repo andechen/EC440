@@ -50,25 +50,14 @@ struct thread_control_block{
 
 // Define global variables
 struct thread_control_block TCB_Table[MAX_THREADS];	// Table of all threads
-pthread_t global_tid = 0;							// Currently running thread ID
+pthread_t TID = 0;									// Currently running thread ID
 struct sigaction signal_handler;					// Signal handler setup for SIGALRM
 
-// Save the return value of the threads start_routine function
-void pthread_function_return_save(){
-	unsigned long int reg;
-
-	asm("movq %%rax, %0\n"
-		:"=r"(reg));
-
-    pthread_exit((void *) reg);
-}
-
-// Schedule the thread execution using Round Robin 
 static void schedule(){
 	// Set current thread to TS_READY
-	switch(TCB_Table[global_tid].status){
+	switch(TCB_Table[TID].status){
 		case TS_RUNNING	:
-			TCB_Table[global_tid].status = TS_READY;
+			TCB_Table[TID].status = TS_READY;
 			break;
 		case TS_EXITED	:
 		case TS_READY	:
@@ -78,7 +67,7 @@ static void schedule(){
 	}
 
 	// Finding the next thread to schedule
-	pthread_t current_tid = global_tid;
+	pthread_t current_tid = TID;
 	while(1){
 		if(current_tid == MAX_THREADS - 1){
 			current_tid = 0;
@@ -95,19 +84,18 @@ static void schedule(){
 
 	int jump = 0;
 	// If the thread has not exited, save its state
-	if(TCB_Table[global_tid].status != TS_EXITED){
-		jump = setjmp(TCB_Table[global_tid].regs);
+	if(TCB_Table[TID].status != TS_EXITED){
+		jump = setjmp(TCB_Table[TID].regs);
 	}
 
 	// Run the next thread
 	if(!jump){
-		global_tid = current_tid;
-		TCB_Table[global_tid].status = TS_RUNNING;
-		longjmp(TCB_Table[global_tid].regs, 1);
+		TID = current_tid;
+		TCB_Table[TID].status = TS_RUNNING;
+		longjmp(TCB_Table[TID].regs, 1);
 	}
 }
 
-// Initialising threads after the first call of pthread_create
 static void scheduler_init(){
 	// Initialise all threads as TS_EMPTY
 	for(int i = 0; i < MAX_THREADS; i++){
@@ -127,7 +115,6 @@ static void scheduler_init(){
 	sigaction(SIGALRM, &signal_handler, NULL);
 }
 
-// Creating a thread
 int pthread_create(
 	pthread_t *thread, const pthread_attr_t *attr,
 	void *(*start_routine) (void *), void *arg)
@@ -199,14 +186,13 @@ int pthread_create(
 	return 0;
 }
 
-// Exit the thread
 void pthread_exit(void *value_ptr){
 	// Status -> TS_EXITED
-	TCB_Table[global_tid].status = TS_EXITED;
+	TCB_Table[TID].status = TS_EXITED;
 
 	// Wait...
-	pthread_t tid = TCB_Table[global_tid].tid;
-	if(tid != global_tid){
+	pthread_t tid = TCB_Table[TID].tid;
+	if(tid != TID){
 		TCB_Table[tid].status = TS_READY;
 	}
 
@@ -238,7 +224,6 @@ void pthread_exit(void *value_ptr){
 	exit(0);
 }
 
-// ID of the current thread
 pthread_t pthread_self(void){
-	return global_tid;
+	return TID;
 }

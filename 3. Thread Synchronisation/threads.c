@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <semaphore.h>
 
 /* You can support more threads. At least support this many. */
 #define MAX_THREADS 128
@@ -32,8 +33,7 @@
 
 /* thread_status identifies the current state of a thread. You can add, rename,
  * or delete these values. This is only a suggestion. */
-enum thread_status
-{
+enum thread_status{
 	TS_EXITED,
 	TS_RUNNING,
 	TS_READY,
@@ -42,37 +42,26 @@ enum thread_status
 };
 
 // The thread control block stores information about a thread. 
-struct thread_control_block {
+struct thread_control_block{
 	pthread_t tid;
 	void *stack;
 	jmp_buf regs;
 	enum thread_status status;
-	void* exit_status;
-	int created;
+
+	void* exit;
+	bool woken;
 };
 
 // Define global variables
 struct thread_control_block TCB_Table[MAX_THREADS];	// Table of all threads
-pthread_t global_tid = 0;							// Currently running thread ID
+pthread_t TID = 0;									// Currently running thread ID
 struct sigaction signal_handler;					// Signal handler setup for SIGALRM
 
-// Save the return value of the threads start_routine function
-void pthread_function_return_save(){
-	unsigned long int reg;
-
-	asm("movq %%rax, %0\n"
-		:"=r"(reg));
-
-    pthread_exit((void *) reg);
-}
-
-// Schedule the thread execution using Round Robin 
-static void schedule()
-{
+static void schedule(){
 	// Set current thread to TS_READY
-	switch(TCB_Table[global_tid].status){
+	switch(TCB_Table[TID].status){
 		case TS_RUNNING	:
-			TCB_Table[global_tid].status = TS_READY;
+			TCB_Table[TID].status = TS_READY;
 			break;
 		case TS_EXITED	:
 		case TS_READY	:
@@ -82,9 +71,8 @@ static void schedule()
 	}
 
 	// Finding the next thread to schedule
-	int thread_found = 0;
-	pthread_t current_tid = global_tid;
-	while(!thread_found){
+	pthread_t current_tid = TID;
+	while(1){
 		if(current_tid == MAX_THREADS - 1){
 			current_tid = 0;
 		}
@@ -94,36 +82,29 @@ static void schedule()
 
 		// If the found thread's state is TS_READY, break the loop
 		if(TCB_Table[current_tid].status == TS_READY){
-			thread_found = 1;
+			break;
 		}
 	}
 
 	int jump = 0;
-	// If the thread has been created and has not exited, save its state
-	if((TCB_Table[global_tid].created == 0) && (TCB_Table[global_tid].status != TS_EXITED)){
-		jump = setjmp(TCB_Table[global_tid].regs);
-	}
-
-	if(TCB_Table[current_tid].created){
-		TCB_Table[current_tid].created = 0;
+	// If the thread has not exited, save its state
+	if(TCB_Table[TID].status != TS_EXITED){
+		jump = setjmp(TCB_Table[TID].regs);
 	}
 
 	// Run the next thread
 	if(!jump){
-		global_tid = current_tid;
-		TCB_Table[global_tid].status = TS_RUNNING;
-		longjmp(TCB_Table[global_tid].regs, 1);
+		TID = current_tid;
+		TCB_Table[TID].status = TS_RUNNING;
+		longjmp(TCB_Table[TID].regs, 1);
 	}
 }
 
-// Initialising threads after the first call of pthread_create
-static void scheduler_init()
-{
+static void scheduler_init(){
 	// Initialise all threads as TS_EMPTY
 	for(int i = 0; i < MAX_THREADS; i++){
 		TCB_Table[i].status = TS_EMPTY;
 		TCB_Table[i].tid = i;
-		TCB_Table[i].created = 0;
 	}
 
 	// Setup the scheduler to SIGALRM at a specified interval
@@ -138,7 +119,6 @@ static void scheduler_init()
 	sigaction(SIGALRM, &signal_handler, NULL);
 }
 
-// Creating a thread
 int pthread_create(
 	pthread_t *thread, const pthread_attr_t *attr,
 	void *(*start_routine) (void *), void *arg)
@@ -151,9 +131,7 @@ int pthread_create(
 	if (is_first_call){
 		scheduler_init();
 		is_first_call = false;
-		
 		TCB_Table[0].status = TS_READY;
-		TCB_Table[0].created = 1;
 		main_thread = setjmp(TCB_Table[0].regs);
 	}
 
@@ -198,9 +176,6 @@ int pthread_create(
 
 		// Status -> TS_READY
         TCB_Table[current_tid].status = TS_READY;
-        
-		// Created a thread, used in schedule()
-        TCB_Table[current_tid].created = 1;
 
 		// Set the tid
         TCB_Table[current_tid].tid = current_tid;
@@ -215,17 +190,13 @@ int pthread_create(
 	return 0;
 }
 
-// Exit the thread
-void pthread_exit(void *value_ptr)
-{
+void pthread_exit(void *value_ptr){
 	// Status -> TS_EXITED
-	TCB_Table[global_tid].status = TS_EXITED;
-
-	TCB_Table[global_tid].exit_status = value_ptr;
+	TCB_Table[TID].status = TS_EXITED;
 
 	// Wait...
-	pthread_t tid = TCB_Table[global_tid].tid;
-	if(tid != global_tid){
+	pthread_t tid = TCB_Table[TID].tid;
+	if(tid != TID){
 		TCB_Table[tid].status = TS_READY;
 	}
 
@@ -257,8 +228,124 @@ void pthread_exit(void *value_ptr)
 	exit(0);
 }
 
-// ID of the current thread
-pthread_t pthread_self(void)
-{
-	return global_tid;
+pthread_t pthread_self(void){
+	return TID;
+}
+
+
+//***************************************Thread Sync***************************************//
+
+struct semaphoreControlBlock{
+    int wakeup;                          
+    struct p_queue* blocked;       
+    int init;                  
+};
+
+void lock(){
+    sigset_t signal_set;
+    sigemptyset(&signal_set);
+    sigaddset(&signal_set, SIGALRM);
+    sigprocmask(SIG_BLOCK, &signal_set, NULL);
+}
+
+void unlock(){
+    sigset_t signal_set;
+    sigemptyset(&signal_set);
+    sigaddset(&signal_set, SIGALRM);
+    sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
+}
+
+int pthread_join(pthread_t thread, void** value_ptr){  
+    switch(TCB_Table[thread].status)
+    {
+        case TS_READY   :
+        case TS_RUNNING :
+        case TS_BLOCKED :              
+            TCB_Table[TID].status = TS_BLOCKED;
+            TCB_Table[thread].tid = TID;
+	        schedule();
+            
+        case TS_EXITED:
+            if (value_ptr){
+                *value_ptr = TCB_Table[thread].exit;
+			}
+
+            //Clean up the targets context
+            free(TCB_Table[thread].stack);
+            TCB_Table[thread].status = TS_EMPTY;
+            break;
+
+        case TS_EMPTY:
+            printf("ERROR");
+            return 3; //ESRCH 3 No such process
+            break;
+    }
+    return 0;
+}
+
+int sem_init(sem_t *sem, int pshared, unsigned value){
+    
+    struct semaphoreControlBlock* SCB = (struct semaphoreControlBlock*) malloc(sizeof(struct semaphoreControlBlock));
+
+    SCB->wakeup = value;
+    SCB->blocked = Queue();
+    SCB->init = 1;
+
+    sem->__align = (long) SCB;
+    
+    return 0;
+}
+
+int sem_wait(sem_t *sem){
+    struct semaphoreControlBlock* SCB = (struct semaphoreControlBlock*)(sem->__align);
+
+    if (SCB->wakeup <= 0){
+        TCB_Table[TID].status = TS_BLOCKED;
+        enqueue(SCB->blocked, TID);
+        schedule();
+    }
+    else{
+        (SCB->wakeup)--;
+        return 0;
+    }
+
+    if (TCB_Table[TID].woken){
+        TCB_Table[TID].woken = false;
+        return 0;
+    }
+
+    return -1;
+}
+
+int sem_post(sem_t *sem){
+    struct semaphoreControlBlock* SCB = (struct semaphoreControlBlock*)(sem->__align);
+
+    if (SCB->wakeup >= 0){
+        pthread_t wait = dequeue(SCB->blocked);
+        
+        if (wait != -1){
+            TCB_Table[wait].woken = 1;
+            TCB_Table[wait].status = TS_READY;
+        }
+        else{
+            (SCB->wakeup)++;
+        }
+
+        return 0;
+    }
+    
+    return -1;
+}
+
+int sem_destroy(sem_t *sem){
+    struct semaphoreControlBlock* SCB = (struct semaphoreControlBlock*)(sem->__align);
+
+    if (SCB->init == 1){
+        free((void *)(sem->__align));   
+    }
+    else{
+        return -1; 
+    }
+    
+    return 0;
 }
