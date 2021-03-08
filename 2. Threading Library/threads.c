@@ -198,8 +198,8 @@ void pthread_exit(void *value_ptr){
 
 	// Check if there are any threads that are ready to exit
 	int threads_left = 0;
-	int i;
-	for(i = 0; i < MAX_THREADS; i++){
+
+	for(int i = 0; i < MAX_THREADS; i++){
 		switch(TCB_Table[i].status){
 			case TS_READY	:
 			case TS_RUNNING	:
@@ -216,7 +216,7 @@ void pthread_exit(void *value_ptr){
 		schedule();
 	}
 
-	for(i = 0; i < MAX_THREADS; i++){
+	for(int i = 0; i < MAX_THREADS; i++){
 		if(TCB_Table[i].status == TS_EXITED){
 			free(TCB_Table[i].stack);
 		}
