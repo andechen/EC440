@@ -8,7 +8,11 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <semaphore.h>
+
+
+#include <assert.h>
+
+#define UNLOCKED    (0u)
 
 /* You can support more threads. At least support this many. */
 #define MAX_THREADS 128
@@ -235,7 +239,7 @@ pthread_t pthread_self(void){
 
 //***************************************Thread Sync***************************************//
 
-struct semaphoreControlBlock{
+struct MutexControlBlock{
     int wakeup;                          
     struct p_queue* blocked;       
     int init;                  
@@ -255,97 +259,69 @@ void unlock(){
     sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
 }
 
-int pthread_join(pthread_t thread, void** value_ptr){  
-    switch(TCB_Table[thread].status)
-    {
-        case TS_READY   :
-        case TS_RUNNING :
-        case TS_BLOCKED :              
-            TCB_Table[TID].status = TS_BLOCKED;
-            TCB_Table[thread].tid = TID;
-	        schedule();
-            
-        case TS_EXITED:
-            if (value_ptr){
-                *value_ptr = TCB_Table[thread].exit;
-			}
+int pthread_mutex_init(pthread_mutex_t *restrict mutex, const pthread_mutexattr_t *restrict attr){
+	
+	struct MutexControlBlock* MCB = (struct MutexControlBlock*) malloc(sizeof(struct MutexControlBlock));
+	MCB->blocked = Queue();
 
-            //Clean up the targets context
-            free(TCB_Table[thread].stack);
-            TCB_Table[thread].status = TS_EMPTY;
-            break;
+	
+	mutex->__align = (long)MCB;
+	
 
-        case TS_EMPTY:
-            printf("ERROR");
-            return 3; //ESRCH 3 No such process
-            break;
-    }
-    return 0;
-}
+	return (0);
+};
 
-int sem_init(sem_t *sem, int pshared, unsigned value){
-    
-    struct semaphoreControlBlock* SCB = (struct semaphoreControlBlock*) malloc(sizeof(struct semaphoreControlBlock));
+int pthread_mutex_destroy(pthread_mutex_t *mutex){
+	
+	free(mutex);
+	
+	return -1;
+};
 
-    SCB->wakeup = value;
-    SCB->blocked = Queue();
-    SCB->init = 1;
+int pthread_mutex_lock(pthread_mutex_t *mutex){
+	if(mutex->__data.__count != 0){
+		mutex->__data.__owner = 0;
+		return EINVAL;
+	}
+	lock();
 
-    sem->__align = (long) SCB;
-    
-    return 0;
-}
+	return 0;
+};
 
-int sem_wait(sem_t *sem){
-    struct semaphoreControlBlock* SCB = (struct semaphoreControlBlock*)(sem->__align);
+int pthread_mutex_unlock(pthread_mutex_t *mutex){
+	if(mutex->__data.__count != 0){
+		mutex->__data.__owner = 0;
+		return EINVAL;
+	}
+	unlock();
 
-    if (SCB->wakeup <= 0){
-        TCB_Table[TID].status = TS_BLOCKED;
-        enqueue(SCB->blocked, TID);
-        schedule();
-    }
-    else{
-        (SCB->wakeup)--;
-        return 0;
-    }
+	return 0;
+};
 
-    if (TCB_Table[TID].woken){
-        TCB_Table[TID].woken = false;
-        return 0;
-    }
+// Barrier Functions
 
-    return -1;
-}
 
-int sem_post(sem_t *sem){
-    struct semaphoreControlBlock* SCB = (struct semaphoreControlBlock*)(sem->__align);
 
-    if (SCB->wakeup >= 0){
-        pthread_t wait = dequeue(SCB->blocked);
-        
-        if (wait != -1){
-            TCB_Table[wait].woken = 1;
-            TCB_Table[wait].status = TS_READY;
-        }
-        else{
-            (SCB->wakeup)++;
-        }
+int pthread_barrier_init(pthread_barrier_t *restrict barrier, const pthread_barrierattr_t *restrict attr, unsigned count){
+	
+	pthread_barrier_t *restrict b = NULL;
 
-        return 0;
-    }
-    
-    return -1;
-}
+	if (count == 0)
+		return (EINVAL);
 
-int sem_destroy(sem_t *sem){
-    struct semaphoreControlBlock* SCB = (struct semaphoreControlBlock*)(sem->__align);
+	b = calloc(1, sizeof (*b));
+	if (b == NULL)
+		return (ENOMEM);
 
-    if (SCB->init == 1){
-        free((void *)(sem->__align));   
-    }
-    else{
-        return -1; 
-    }
-    
-    return 0;
-}
+	*barrier = *b;
+
+	return (0);
+};
+
+int pthread_barrier_destroy(pthread_barrier_t *barrier){
+	return 0;
+};
+
+int pthread_barrier_wait(pthread_barrier_t *barrier){
+	return 0;
+};
