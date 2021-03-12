@@ -1,9 +1,16 @@
 #ifndef __EC440THREADS__
 #define __EC440THREADS__
 
-#include <stdio.h> 
-#include <stdlib.h> 
 #include <pthread.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <setjmp.h>
+#include <stdio.h>
+#include <signal.h>
+#include <unistd.h>
+#include <string.h>
+#include <errno.h>
+
 
 /*
 static unsigned long int ptr_demangle(unsigned long int p)
@@ -58,6 +65,25 @@ void pthread_function_return_save(){
     pthread_exit((void *) reg);
 }
 
+/* thread_status identifies the current state of a thread. You can add, rename,
+ * or delete these values. This is only a suggestion. */
+enum thread_status{
+	TS_EXITED,
+	TS_RUNNING,
+	TS_READY,
+	TS_EMPTY,
+	TS_BLOCKED
+};
+
+// The thread control block stores information about a thread. 
+struct thread_control_block{
+	pthread_t tid;
+	void *stack;
+	jmp_buf regs;
+	enum thread_status status;
+};
+
+
 // Schedule the thread execution using Round Robin 
 static void schedule();
 
@@ -75,60 +101,6 @@ void pthread_exit(void *value_ptr);
 // ID of the current thread
 pthread_t pthread_self(void);
 
-//
-struct p_node{ 
-    pthread_t key; 
-    struct p_node* next; 
-}; 
-
-//
-struct p_queue{ 
-    struct p_node *front, *rear; 
-}; 
-  
-//
-struct p_node* Node(pthread_t key){ 
-    struct p_node* temp = (struct p_node*)malloc(sizeof(struct p_node)); 
-    temp->key = key; 
-    temp->next = NULL; 
-    return temp; 
-} 
-  
-//
-struct p_queue* Queue(){ 
-    struct p_queue* queue = (struct p_queue*)malloc(sizeof(struct p_queue)); 
-    queue->front = queue->rear = NULL; 
-    return queue; 
-} 
-
-//
-void enqueue(struct p_queue* queue, pthread_t key){ 
-    struct p_node* temp = Node(key); 
-
-    if (queue->rear == NULL){ 
-        queue->front = queue->rear = temp; 
-        return; 
-    } 
-
-    queue->rear->next = temp; 
-    queue->rear = temp; 
-} 
-
-//
-pthread_t dequeue(struct p_queue* queue){ 
-    if (queue->front == NULL){
-        return (pthread_t) -1;
-    } 
-
-    struct p_node* temp = queue->front; 
-  
-    queue->front = queue->front->next; 
-
-    if (queue->front == NULL) 
-        queue->rear = NULL; 
-  
-    return temp->key;
-} 
 
 // Mutex Functions
 
@@ -148,4 +120,6 @@ int pthread_barrier_destroy(pthread_barrier_t *barrier);
 
 int pthread_barrier_wait(pthread_barrier_t *barrier);
 
+
+  
 #endif
