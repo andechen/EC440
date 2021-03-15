@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include "queue.h"
 
 /* You can support more threads. At least support this many. */
 #define MAX_THREADS 128
@@ -295,72 +296,62 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex){
 }
 
 typedef struct{
-	pthread_mutex_t *mutex;
-	pthread_cond_t *cond;
+	// pthread_mutex_t *mutex;
+	struct Queue* blockedThreads;
 	unsigned count;
 	unsigned left;
-	unsigned round;
+	int init;
+	// unsigned round;
 }BarrierControlBlock;
 
 int pthread_barrier_init(pthread_barrier_t *restrict barrier, const pthread_barrierattr_t *restrict attr, unsigned count){
 	if(count == 0){
 		return EINVAL;
 	}
-	// BarrierControlBlock *BCB = (BarrierControlBlock *) (barrier->__align);
+	BarrierControlBlock *BCB = (BarrierControlBlock*) malloc(sizeof(BarrierControlBlock));
 
-	// pthread_condattr_t condattr;
-	// pthread_condattr_init(&condattr);
-
-	// int ret = pthread_mutex_init(BCB->mutex, NULL);
-	// if(ret){
-	// 	return ret;
-	// }
-
-	// ret = pthread_cond_init(BCB->cond, &condattr);
-	// if (ret) {
-	// 	pthread_mutex_destroy(BCB->mutex);
-	// 	return ret;
-	// }
-
-	// BCB->count = count;
-	// BCB->left = count;
-	// BCB->round = 0;
+	BCB->count = count;
+	BCB->blockedThreads = createQueue();
+	BCB->left = count;
+	BCB->init = 1;
+	
+	barrier->__align = (long) BCB;
 
 	return 0;
 }
 
 int pthread_barrier_destroy(pthread_barrier_t *barrier){
-	// BarrierControlBlock *BCB = (BarrierControlBlock *) (barrier->__align);
+	BarrierControlBlock *BCB = (BarrierControlBlock *) (barrier->__align);
 
-	// if(BCB->count == 0){
-	// 	return EINVAL;
-	// }
-
-	// BCB->count = 0;
-	// int rm = pthread_mutex_destroy(BCB->mutex);
-	// int rc = pthread_cond_destroy(BCB->cond);
-	// return rm ? rm : rc;
+	if(BCB->init == 1){
+		free((void *)(barrier->__align));
+	}
+	else{
+		return -1;
+	}
+	
 	return 0;
 }
 
 int pthread_barrier_wait(pthread_barrier_t *barrier){
-	// BarrierControlBlock *BCB = (BarrierControlBlock *) (barrier->__align);
-	// pthread_mutex_lock(BCB->mutex);
+	BarrierControlBlock *BCB = (BarrierControlBlock *) (barrier->__align);
 
-	// if(--(BCB->left)){
-	// 	unsigned round = BCB->round;
-	// 	do{
-	// 		pthread_cond_wait(BCB->cond, BCB->mutex);
-	// 	}while(round == BCB->round);
-	// 	pthread_mutex_unlock(BCB->mutex);
-	// 	return 0;
-	// }
-	// else{
-	// 	BCB->round++;
-	// 	BCB->left = BCB->count;
-	// 	pthread_cond_broadcast(BCB->cond);
-	// 	pthread_mutex_unlock(BCB->mutex);
-	// 	return 1;
-	// }
+	while(BCB->left != 0){
+		TCB_Table[TID].status = TS_BLOCKED;
+		enQueue(BCB->blockedThreads, TID);
+		BCB->left--;
+		schedule();
+	}
+
+	lock();
+	pthread_t currentTID;
+	while(BCB->left != BCB->count){
+		currentTID = deQueue(BCB->blockedThreads);
+		BCB->left++;
+		TID = currentTID;
+		TCB_Table[TID].status = TS_READY;
+		schedule();
+	}
+	unlock();
 	return 0;
 }
