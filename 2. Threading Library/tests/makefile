@@ -1,4 +1,4 @@
-override CFLAGS := -Wall -Werror -std=gnu99 -Og -g $(CFLAGS) -I.
+override CFLAGS := -Wall -Werror -std=gnu99 -O0 -g $(CFLAGS) -I.
 
 # Build the threads.o file
 threads.o: threads.c ec440threads.h

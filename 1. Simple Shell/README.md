@@ -1,4 +1,4 @@
-A README file for Project 1, Simple Shell.
+# <ins>Project 1: Simple Shell</ins>
 
 Project Description:
 The goal of this project is to implement a basic shell which is able to execute commands, redirect the standard input/output (​stdin/stdout​) of commands to files, pipe the output of commands to other commands, and carry out commands in the background. In the optional previous assignment, you developed a shell parser that implements the same input requirements as this assignment. If you started or completed challenge 0, be sure to use that as your starting point for this assignment!

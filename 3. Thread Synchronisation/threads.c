@@ -8,7 +8,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include "queue.h"
 
 /* You can support more threads. At least support this many. */
 #define MAX_THREADS 128
@@ -35,7 +34,6 @@
 struct thread_control_block TCB_Table[MAX_THREADS];	// Table of all threads
 pthread_t TID = 0;									// Currently running thread ID
 struct sigaction signal_handler;					// Signal handler setup for SIGALRM
-
 
 static void schedule(){
 	// Set current thread to TS_READY
@@ -212,146 +210,142 @@ pthread_t pthread_self(void){
 	return TID;
 }
 
-
 //***************************************Thread Sync***************************************//
-static void lock(){
-	sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGALRM);
-    sigprocmask(SIG_BLOCK, &set, NULL);
-}
-
-static void unlock(){
-	sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGALRM);
-    sigprocmask(SIG_UNBLOCK, &set, NULL);
-}
-
-typedef struct{
-	pthread_t tid;
-	void* data;
-	struct linked_list_t *next;
-}linked_list_t;
-
-
-
-typedef struct{
-	int locked;
-	pthread_t owner;
-	linked_list_t *wait_list;
-	linked_list_t *wait_list_tail;
-}MutexControlBlock;
 
 int pthread_mutex_init(pthread_mutex_t *restrict mutex, const pthread_mutexattr_t *restrict attr){
 	MutexControlBlock *MCB = (MutexControlBlock *) malloc(sizeof(MutexControlBlock));
-	lock();
 
-	//MCB = (MutexControlBlock *) mutex;
-	MCB->locked = 0;
-	MCB->owner = TID;
-	
-	
-	mutex->__align = (long) MCB;
-	unlock();
-	return 0;
+    MCB->locked = 0;
+	MCB->wait_list = NULL;
+	MCB->wait_list_tail = NULL;
+
+	mutex->__align = (long) MCB;	// Align the struct pointer with the mutex
+   	return 0;
 }
 
 int pthread_mutex_destroy(pthread_mutex_t *mutex){
 	MutexControlBlock *MCB = (MutexControlBlock *) (mutex->__align);
-	lock();
-	MCB->locked = 0;
-	MCB->owner = -1;
-	return 0;
+	
+	if(MCB->locked != 1){
+		free((void *)(mutex->__align));
+		return 0;
+	}
+	else{
+		return -1;
+	}
 }
 
 int pthread_mutex_lock(pthread_mutex_t *mutex) {
  	MutexControlBlock *MCB = (MutexControlBlock *) (mutex->__align);
-
-    lock();
-    //if(MCB->owner)
-    //MCB = (MutexControlBlock *) mutex;
-	MCB->locked = 1;
-	MCB->owner = TID;
 	
-	unlock();
+	if(!MCB->locked){	// Thread grabs the lock
+		lock();
+		MCB->locked = 1;
 
-	return 0;
+		unlock();
+		return 0;
+	}
+	else{				// Thread is blocked since the lock is busy
+		lock();
+		TCB_Table[TID].status = TS_BLOCKED;
+		linked_list_put_tail(&MCB->wait_list, &MCB->wait_list_tail, TID);
+		
+		unlock();
+		schedule();
+		return EBUSY;
+	}
 }
 
 int pthread_mutex_unlock(pthread_mutex_t *mutex){
 	MutexControlBlock *MCB = (MutexControlBlock *) (mutex->__align);
-	lock();
-
-	if(MCB->owner != TID){
-		unlock();
-		return -1;
-	}
-
-	MCB->locked = 0;
-	MCB->owner = -1;
-	unlock();
 	
-	return 0;
-}
+	if(linked_list_is_empty(MCB->wait_list)){	// No more threads waiting for the mutex
+		lock();
 
-typedef struct{
-	// pthread_mutex_t *mutex;
-	struct Queue* blockedThreads;
-	unsigned count;
-	unsigned left;
-	int init;
-	// unsigned round;
-}BarrierControlBlock;
+		MCB->locked = 0;
+
+		unlock();
+		return 0;
+	}
+	else{										// More threads are waiting for the mutex
+		lock();
+		pthread_t next_thread;
+		linked_list_get_head(&MCB->wait_list, &MCB->wait_list_tail, &next_thread);
+		MCB->locked = 1;
+
+		TCB_Table[next_thread].status = TS_READY;
+			
+		unlock();
+		schedule();
+		return 0;
+	}
+}
 
 int pthread_barrier_init(pthread_barrier_t *restrict barrier, const pthread_barrierattr_t *restrict attr, unsigned count){
 	if(count == 0){
 		return EINVAL;
 	}
+
 	BarrierControlBlock *BCB = (BarrierControlBlock*) malloc(sizeof(BarrierControlBlock));
 
-	BCB->count = count;
-	BCB->blockedThreads = createQueue();
-	BCB->left = count;
 	BCB->init = 1;
-	
-	barrier->__align = (long) BCB;
+	BCB->flag = 0;
+	BCB->calling_thread = -1;
+	BCB->count = count;
+	BCB->left = count;
 
+	barrier->__align = (long) BCB;		// Align the struct pointer with the barrier
 	return 0;
 }
 
 int pthread_barrier_destroy(pthread_barrier_t *barrier){
 	BarrierControlBlock *BCB = (BarrierControlBlock *) (barrier->__align);
 
-	if(BCB->init == 1){
+	if(BCB->init != 1){
+		BCB->init = 0;
+		BCB->calling_thread = -1;
+		BCB->count = 0;
+		BCB->left = 0;
+
 		free((void *)(barrier->__align));
+		return 0;
 	}
 	else{
 		return -1;
 	}
-	
 	return 0;
 }
 
 int pthread_barrier_wait(pthread_barrier_t *barrier){
 	BarrierControlBlock *BCB = (BarrierControlBlock *) (barrier->__align);
+	
+	(BCB->left)--;
 
-	while(BCB->left != 0){
+	if(BCB->flag != 1){						// Calling thread gets blocked
+		lock();
 		TCB_Table[TID].status = TS_BLOCKED;
-		enQueue(BCB->blockedThreads, TID);
-		BCB->left--;
-		schedule();
-	}
+		BCB->calling_thread = TID;
+		BCB->flag = 1;
 
-	lock();
-	pthread_t currentTID;
-	while(BCB->left != BCB->count){
-		currentTID = deQueue(BCB->blockedThreads);
-		BCB->left++;
-		TID = currentTID;
-		TCB_Table[TID].status = TS_READY;
+		unlock();
 		schedule();
 	}
-	unlock();
-	return 0;
+	
+	while(BCB->left != 0){					// Other threads wait here so that they don't exit the barrier
+		schedule();
+	}
+					
+	if(BCB->flag == 1){						// Unblock the calling thread
+		BCB->flag = 0;
+		TCB_Table[BCB->calling_thread].status = TS_READY;
+	}		
+	
+	schedule();							
+	if(BCB->calling_thread == TID){			// One thread returns PTHREAD_BARRIER_SERIAL_THREAD
+		BCB->left = BCB->count;
+		return PTHREAD_BARRIER_SERIAL_THREAD;
+	}	
+	else{									// Others return 0
+		return 0;
+	}
 }

@@ -11,6 +11,7 @@
 #include <string.h>
 #include <errno.h>
 
+#define MAX_THREADS 128
 
 /*
 static unsigned long int ptr_demangle(unsigned long int p)
@@ -83,7 +84,6 @@ struct thread_control_block{
 	enum thread_status status;
 };
 
-
 // Schedule the thread execution using Round Robin 
 static void schedule();
 
@@ -101,25 +101,102 @@ void pthread_exit(void *value_ptr);
 // ID of the current thread
 pthread_t pthread_self(void);
 
+//***************************************Thread Sync***************************************//
 
-// Mutex Functions
+// Lock SIGALRM
+static void lock(){
+	sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGALRM);
+    sigprocmask(SIG_BLOCK, &set, NULL);
+}
 
+// Unlock SIGALRM
+static void unlock(){
+	sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGALRM);
+    sigprocmask(SIG_UNBLOCK, &set, NULL);
+}
+
+// Linked list struct
+typedef struct linked_list_t{
+	pthread_t tid;
+	struct linked_list_t *next;
+}linked_list_t;
+
+// Put on the tail of the linked list
+static void linked_list_put_tail(linked_list_t **list, linked_list_t **tail, pthread_t tid) {
+    linked_list_t *to_ins = (linked_list_t *) malloc(sizeof(linked_list_t));
+
+    to_ins->tid = tid;
+    to_ins->next = NULL;
+
+    if ((*list) == NULL) {
+        (*list) = to_ins;
+        (*tail) = to_ins;
+    } else {
+        list = &((*tail)->next);
+        (*list) = to_ins;
+        (*tail) = to_ins;
+    }
+}
+
+// Get the head of the linked list
+static void linked_list_get_head(linked_list_t **list, linked_list_t **tail, pthread_t *tid) {
+    linked_list_t *to_del;
+
+    to_del = (*list);
+    if (tid != NULL) {
+        (*tid) = to_del->tid;
+    }
+    (*list) = to_del->next;
+    free(to_del);
+    if ((*list) == NULL) {
+        (*tail) = NULL;
+    }
+}
+
+// Check if the linked list is empty
+static int linked_list_is_empty(linked_list_t *list) {
+    return (list == NULL);
+}
+
+// Mutex struct
+typedef struct{
+	char locked;
+	linked_list_t *wait_list;
+	linked_list_t *wait_list_tail;
+}MutexControlBlock;
+
+// Mutex initialiser
 int pthread_mutex_init(pthread_mutex_t *restrict mutex, const pthread_mutexattr_t *restrict attr);
 
+// Mutex destructor
 int pthread_mutex_destroy(pthread_mutex_t *mutex);
 
+// Lock the mutex
 int pthread_mutex_lock(pthread_mutex_t *mutex);
 
+// Unlock the mutex
 int pthread_mutex_unlock(pthread_mutex_t *mutex);
 
-// Barrier Functions
+// Barrier struct
+typedef struct{
+	char init;
+	char flag;
+	pthread_t calling_thread;
+	unsigned count;
+	unsigned left;
+}BarrierControlBlock;
 
+// Barrier initialiser
 int pthread_barrier_init(pthread_barrier_t *restrict barrier, const pthread_barrierattr_t *restrict attr, unsigned count);
 
+// Barrier destructor
 int pthread_barrier_destroy(pthread_barrier_t *barrier);
 
+// Filling the barrier
 int pthread_barrier_wait(pthread_barrier_t *barrier);
 
-
-  
 #endif
