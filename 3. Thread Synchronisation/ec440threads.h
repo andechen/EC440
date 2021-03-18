@@ -77,12 +77,12 @@ enum thread_status{
 };
 
 // The thread control block stores information about a thread. 
-struct thread_control_block{
+typedef struct thread_control_block{
 	pthread_t tid;
 	void *stack;
 	jmp_buf regs;
 	enum thread_status status;
-};
+}thread_control_block;
 
 // Schedule the thread execution using Round Robin 
 static void schedule();
@@ -120,14 +120,14 @@ static void unlock(){
 }
 
 // Linked list struct
-typedef struct linked_list_t{
+typedef struct linked_list{
 	pthread_t tid;
-	struct linked_list_t *next;
-}linked_list_t;
+	struct linked_list *next;
+}linked_list;
 
 // Put on the tail of the linked list
-static void linked_list_put_tail(linked_list_t **list, linked_list_t **tail, pthread_t tid) {
-    linked_list_t *to_ins = (linked_list_t *) malloc(sizeof(linked_list_t));
+static void insert_tail(linked_list **list, linked_list **tail, pthread_t tid) {
+    linked_list *to_ins = (linked_list *) malloc(sizeof(linked_list));
 
     to_ins->tid = tid;
     to_ins->next = NULL;
@@ -143,8 +143,8 @@ static void linked_list_put_tail(linked_list_t **list, linked_list_t **tail, pth
 }
 
 // Get the head of the linked list
-static void linked_list_get_head(linked_list_t **list, linked_list_t **tail, pthread_t *tid) {
-    linked_list_t *to_del;
+static void get_head(linked_list **list, linked_list **tail, pthread_t *tid) {
+    linked_list *to_del;
 
     to_del = (*list);
     if (tid != NULL) {
@@ -158,18 +158,18 @@ static void linked_list_get_head(linked_list_t **list, linked_list_t **tail, pth
 }
 
 // Check if the linked list is empty
-static int linked_list_is_empty(linked_list_t *list) {
+static bool is_empty(linked_list *list) {
     return (list == NULL);
 }
 
 // Mutex struct
 typedef struct{
 	char locked;
-	linked_list_t *wait_list;
-	linked_list_t *wait_list_tail;
+	linked_list *wait_list;
+	linked_list *wait_list_tail;
 }MutexControlBlock;
 
-// Mutex initialiser
+// Mutex constructor
 int pthread_mutex_init(pthread_mutex_t *restrict mutex, const pthread_mutexattr_t *restrict attr);
 
 // Mutex destructor
@@ -190,7 +190,7 @@ typedef struct{
 	unsigned left;
 }BarrierControlBlock;
 
-// Barrier initialiser
+// Barrier constructor
 int pthread_barrier_init(pthread_barrier_t *restrict barrier, const pthread_barrierattr_t *restrict attr, unsigned count);
 
 // Barrier destructor

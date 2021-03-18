@@ -31,7 +31,7 @@
 #define JB_PC 7
 
 // Define global variables
-struct thread_control_block TCB_Table[MAX_THREADS];	// Table of all threads
+thread_control_block TCB_Table[MAX_THREADS];	// Table of all threads
 pthread_t TID = 0;									// Currently running thread ID
 struct sigaction signal_handler;					// Signal handler setup for SIGALRM
 
@@ -248,7 +248,7 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
 	else{				// Thread is blocked since the lock is busy
 		lock();
 		TCB_Table[TID].status = TS_BLOCKED;
-		linked_list_put_tail(&MCB->wait_list, &MCB->wait_list_tail, TID);
+		insert_tail(&MCB->wait_list, &MCB->wait_list_tail, TID);
 		
 		unlock();
 		schedule();
@@ -259,7 +259,7 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
 int pthread_mutex_unlock(pthread_mutex_t *mutex){
 	MutexControlBlock *MCB = (MutexControlBlock *) (mutex->__align);
 	
-	if(linked_list_is_empty(MCB->wait_list)){	// No more threads waiting for the mutex
+	if(is_empty(MCB->wait_list)){	// No more threads waiting for the mutex
 		lock();
 
 		MCB->locked = 0;
@@ -270,7 +270,7 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex){
 	else{										// More threads are waiting for the mutex
 		lock();
 		pthread_t next_thread;
-		linked_list_get_head(&MCB->wait_list, &MCB->wait_list_tail, &next_thread);
+		get_head(&MCB->wait_list, &MCB->wait_list_tail, &next_thread);
 		MCB->locked = 1;
 
 		TCB_Table[next_thread].status = TS_READY;
@@ -334,12 +334,12 @@ int pthread_barrier_wait(pthread_barrier_t *barrier){
 	while(BCB->left != 0){					// Other threads wait here so that they don't exit the barrier
 		schedule();
 	}
-					
+	lock();				
 	if(BCB->flag == 1){						// Unblock the calling thread
 		BCB->flag = 0;
 		TCB_Table[BCB->calling_thread].status = TS_READY;
 	}		
-	
+	unlock();
 	schedule();							
 	if(BCB->calling_thread == TID){			// One thread returns PTHREAD_BARRIER_SERIAL_THREAD
 		BCB->left = BCB->count;
