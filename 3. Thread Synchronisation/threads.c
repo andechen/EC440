@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <semaphore.h>
 
 /* You can support more threads. At least support this many. */
 #define MAX_THREADS 128
@@ -210,6 +211,40 @@ pthread_t pthread_self(void){
 	return TID;
 }
 
+int pthread_join(pthread_t thread, void** value_ptr){
+  
+    switch(tcbArray[thread].status)
+    {
+        case TS_READY   :
+        case TS_RUNNING :
+        case TS_BLOCKED :
+            //Set the status to Blocked and add it to the waiting queue of the target                
+            TCB_Table[TID].status = TS_BLOCKED;
+            TCB_Table[thread].waitingTid = TID;
+
+            //Block until the target terminates
+	        schedule();
+            //At some point once the thread is finished, it will be sent back here
+            
+        case TS_DEAD:
+            //Get the exit status of the target if value_ptr isn't NULL
+            if (value_ptr){
+                *value_ptr = TCB_Table[thread].exitStatus;
+			}
+
+            //Clean up the targets context
+            free(TCB_Table[thread].stack);
+            TCB_Table[thread].status = TS_EMPTY;
+            break;
+
+        case TS_EMPTY:
+            printf("ERROR: Undefined behavoir\n");
+            return ESRCH; //ESRCH 3 No such process
+            break;
+    }
+    return 0;
+}
+
 //***************************************Thread Sync***************************************//
 
 int pthread_mutex_init(pthread_mutex_t *restrict mutex, const pthread_mutexattr_t *restrict attr){
@@ -348,4 +383,93 @@ int pthread_barrier_wait(pthread_barrier_t *barrier){
 	else{									// Others return 0
 		return 0;
 	}
+}
+
+/*..................Semaphore library..................*/
+
+int sem_init(sem_t *sem, int pshared, unsigned value){
+    //Initialize semaphore control block to store addtional information needed by the semaphore
+    struct semaphoreControlBlock* scbPtr = (struct semaphoreControlBlock*) malloc(sizeof(struct semaphoreControlBlock));
+
+    scbPtr->value = value;
+    scbPtr->blockedThreads = createQueue();
+    scbPtr->isInitialized = 1;
+
+    //Save that semaphore within the sem_t struct
+    sem->__align = (long) scbPtr;
+    
+    return 0;
+}
+
+//Decrements the semphore referenced by sem
+int sem_wait(sem_t *sem){
+    struct semaphoreControlBlock* scbPtr = (struct semaphoreControlBlock*)(sem->__align);
+
+    //If the value is less or equal to than zero, block
+    if (scbPtr->value <= 0)
+    {
+        tcbArray[globalTid].status = THREAD_BLOCKED;
+        enQueue(scbPtr->blockedThreads, globalTid);
+        scheduleHandler();
+    }
+    //This either happens immediately
+    else
+    {
+        (scbPtr->value)--;
+        return 0;
+    }
+
+    //This will happen if the semaphore is woken
+    if (tcbArray[globalTid].woke)
+    {
+        tcbArray[globalTid].woke = 0;
+        return 0;
+    }
+
+    //Return statement just in case error occurs
+    return -1;
+}
+
+//increments the semphore referenced by sem
+int sem_post(sem_t *sem){
+    struct semaphoreControlBlock* scbPtr = (struct semaphoreControlBlock*)(sem->__align);
+
+    if (scbPtr->value >= 0)
+    {
+        //Either gets the waiting threads tid or returns -1 if the list is empty
+        pthread_t waitingTid = deQueue(scbPtr->blockedThreads);
+        
+        if (waitingTid != -1)
+        {
+            //wakeup waiting thread
+            tcbArray[waitingTid].woke = 1;
+            tcbArray[waitingTid].status = THREAD_READY;
+        }
+        else
+        {
+            //If no thread was waiting, just increment the semaphore
+            (scbPtr->value)++;
+        }
+
+        return 0;
+    }
+    
+    return -1;
+}
+
+//destroys the semphore referenced by sem
+int sem_destroy(sem_t *sem){
+    struct semaphoreControlBlock* scbPtr = (struct semaphoreControlBlock*)(sem->__align);
+
+    //Free's the semaphore control block for this semaphore
+    if (scbPtr->isInitialized == 1)
+    {
+        free((void *)(sem->__align));   
+    }
+    else
+    {
+        return -1; //Error
+    }
+    
+    return 0;
 }

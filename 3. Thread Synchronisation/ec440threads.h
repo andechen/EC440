@@ -73,7 +73,8 @@ enum thread_status{
 	TS_RUNNING,
 	TS_READY,
 	TS_EMPTY,
-	TS_BLOCKED
+	TS_BLOCKED,
+    TS_DEAD
 };
 
 // The thread control block stores information about a thread. 
@@ -100,6 +101,9 @@ void pthread_exit(void *value_ptr);
 
 // ID of the current thread
 pthread_t pthread_self(void);
+
+//Postpones the execution of the calling thread until the target thread terminates
+int pthread_join(pthread_t thread, void** value_ptr);
 
 //***************************************Thread Sync***************************************//
 
@@ -198,5 +202,87 @@ int pthread_barrier_destroy(pthread_barrier_t *barrier);
 
 // Filling the barrier
 int pthread_barrier_wait(pthread_barrier_t *barrier);
+
+/*..................Semaphore library..................*/
+
+// A linked list (LL) node to store a queue entry 
+struct QNode{ 
+    pthread_t key; 
+    struct QNode* next; 
+}; 
+  
+// The queue, front stores the front node of LL and rear stores the 
+// last node of LL 
+struct Queue{ 
+    struct QNode *front, *rear; 
+}; 
+  
+// A utility function to create a new linked list node. 
+struct QNode* newNode(pthread_t k){ 
+    struct QNode* temp = (struct QNode*)malloc(sizeof(struct QNode)); 
+    temp->key = k; 
+    temp->next = NULL; 
+    return temp; 
+} 
+  
+// A utility function to create an empty queue 
+struct Queue* createQueue(){ 
+    struct Queue* q = (struct Queue*)malloc(sizeof(struct Queue)); 
+    q->front = q->rear = NULL; 
+    return q; 
+} 
+  
+// The function to add a key k to q 
+void enQueue(struct Queue* q, pthread_t k){ 
+    // Create a new LL node 
+    struct QNode* temp = newNode(k); 
+  
+    // If queue is empty, then new node is front and rear both 
+    if (q->rear == NULL) { 
+        q->front = q->rear = temp; 
+        return; 
+    } 
+  
+    // Add the new node at the end of queue and change rear 
+    q->rear->next = temp; 
+    q->rear = temp; 
+} 
+  
+// Function to remove a key from given queue q 
+pthread_t deQueue(struct Queue* q){ 
+    // If queue is empty, return NULL. 
+    if (q->front == NULL) 
+        return (pthread_t) -1; 
+  
+    // Store previous front and move front one node ahead 
+    struct QNode* temp = q->front; 
+  
+    q->front = q->front->next; 
+  
+    // If front becomes NULL, then change rear also as NULL 
+    if (q->front == NULL) 
+        q->rear = NULL; 
+  
+    return temp->key;
+} 
+
+//Struct which holds additional information needed for the semaphore implementation
+struct semaphoreControlBlock{
+    int value;                          /*Number of wakeup calls to semaphore*/
+    struct Queue* blockedThreads;       /*Pointer to queue of waiting threads, queue implemented in queueHeader*/
+    int isInitialized;                  /*Flag indicating whether the semaphore is initialized*/
+};
+
+//Intializes the semaphore referenced by sem
+int sem_init(sem_t *sem, int pshared, unsigned value);
+
+//Decrements the semphore referenced by sem
+int sem_wait(sem_t *sem);
+
+//increments the semphore referenced by sem
+int sem_post(sem_t *sem);
+
+//destroys the semphore referenced by sem
+int sem_destroy(sem_t *sem);
 
 #endif
