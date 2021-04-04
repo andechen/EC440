@@ -286,7 +286,6 @@ int tls_write(unsigned int offset, unsigned int length, const char *buffer){
 
 	// Write from the buffer to the TLS
 	for(int count = 0, index = offset; index < (offset + length); ++count, ++index){
-	// for(int count = 0, index = offset; index < (offset + length); count++, index++){
 		Page *page, *page_copy;
 
 		// Calculate the page number in the TLS, its offset and the page itself
@@ -353,8 +352,6 @@ int tls_read(unsigned int offset, unsigned int length, char *buffer){
 	
 	// Read the pages and write them to the buffer
 	for(int count = 0, index = offset; index < (offset + length); ++count, ++index){
-	// for(int count = 0, index = offset; index < (offset + length); count++, index++){
-		
 		Page* page;
 		// Calculate the page number in the TLS, its offset and the page itself
 		unsigned int page_number = index / page_size;
@@ -391,8 +388,6 @@ int tls_clone(pthread_t tid){
 
 	ThreadLocalStorage* targetTLS = target_element->tls;
 
-	// pthread_mutex_lock(&mutex);
-
 	// Create a new item for the table
 	clone_element = (Item*) malloc(sizeof(Item));
 	clone_element->tid = clone_tid;
@@ -409,8 +404,6 @@ int tls_clone(pthread_t tid){
 		clone_element->tls->pages[i] = targetTLS->pages[i];
 		(clone_element->tls->pages[i]->ref_count)++;
 	}
-
-	// pthread_mutex_unlock(&mutex);
 
 	// Check if the insert into the hash table worked, else throw an error
 	if(Add(clone_element)){
