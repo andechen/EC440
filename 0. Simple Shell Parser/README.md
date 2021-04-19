@@ -57,7 +57,7 @@ You will​ ​not implement​ a main function in your submitted code (that wil
 ### Data Structures We Provide
 _Don’t type these out. We will provide a file that contains these data structures and the function declarations_.
 
-//
+![Screenshot 2021-04-19 at 16 17 50](https://user-images.githubusercontent.com/60196280/115298108-071def00-a12b-11eb-93f8-933bc50e84a2.png)
 
 ### Detailed breakdown of a single input​:
 Given ​pipeline_build(“ls|wc -l >counts.txt\n”)​, expect the following parser output:
@@ -76,7 +76,7 @@ Given ​pipeline_build(“ls|wc -l >counts.txt\n”)​, expect the following p
 
 The same output, in visual form is included below:
 
-//
+![Screenshot 2021-04-19 at 16 18 53](https://user-images.githubusercontent.com/60196280/115298122-0c7b3980-a12b-11eb-9a37-7134ec6772f6.png)
 
 ### Some Hints:
 * Solve the lexing/tokenizing problem first, then worry about parsing after that. Write a test that sends the provided valid inputs to your lexing function, and verify that it returns the expected series of tokens.
