@@ -8,14 +8,14 @@ A typical approach to solving a parsing problem is to separate it into two parts
 
 For this assignment, the amount of separating whitespace between tokens has no meaning. That is, two tokens separated by a single space shall be treated the same as two words separated by 10 spaces.
 
-### Tokens​:
+### **Tokens​:**
 * Ampersand (&) is used to indicate a background pipeline
 * Pipe (|) is used to join commands in a pipeline
 * The less-than symbol (<) is used to assign a redirect-in to a command.
 * The greater-than symbol (>) is used to assign a redirect-out to a command.
 * A _​word_​ is used for arguments and redirect paths. It is a sequence of characters that is none of the above tokens, and is not whitespace (i.e., not space, tab ‘\t’, or newline ‘\n’).
 
-### Symbols​:
+### **Symbols​:**
 * The provided line of text may contain zero or 1 _​pipeline_.​ A ​_pipeline_ ​is a sequence of one
 or more ​_command​_ symbols, joined by a pipe token.
 * A ​_command_​ is a series of one or more _​argument_ s​ymbols.
@@ -57,6 +57,8 @@ You will​ ​not implement​ a main function in your submitted code (that wil
 ### Data Structures We Provide
 _Don’t type these out. We will provide a file that contains these data structures and the function declarations_.
 
+//
+
 ### Detailed breakdown of a single input​:
 Given ​pipeline_build(“ls|wc -l >counts.txt\n”)​, expect the following parser output:
 
@@ -73,6 +75,8 @@ Given ​pipeline_build(“ls|wc -l >counts.txt\n”)​, expect the following p
     * Pipeline is_background is false (because no ampersand was present)
 
 The same output, in visual form is included below:
+
+//
 
 ### Some Hints:
 * Solve the lexing/tokenizing problem first, then worry about parsing after that. Write a test that sends the provided valid inputs to your lexing function, and verify that it returns the expected series of tokens.
