@@ -30,18 +30,18 @@ present, they may be specified in either order.
     * If you are already familiar with how redirection and pipes work, you may note that
     there some combinations can’t really work. You don’t need to worry about those
     for this parsing assignment. You are free to ignore such cases at this time.
-    * A pipeline may optionally end with an ​ampersand​ token, indicating that the pipeline
-    should run in the background.
+* A pipeline may optionally end with an ​ampersand​ token, indicating that the pipeline
+should run in the background.
 
-### Examples of Valid Inputs
+### Examples of Valid Inputs:
 
     “/bin/cat my_file\n”, “a& \n”, “pipefrom| pipeto\n”, “cat< a_file\n”, “ls > txt\n”
 
-are all valid inputs.
+These are all valid inputs.
 
 A detailed parsing example of a single input is included in the data structures section of this document.
 
-### Functions You Will Implement
+### <ins>Functions You Will Implement:</ins>
 You are expected to provide an implementation for two functions, which are declared in a header file that we provide:
 
     struct pipeline *pipeline_build(const char *​command_line​);
@@ -50,17 +50,17 @@ This function creates a pipeline structure that represents the given command lin
 
     void pipeline_free(struct pipeline *​pipeline​);
 
-Frees a given ​pipeline​ that was created with pipeline_build(). If your pipeline_build() function performs any dynamic memory allocation, this is where the corresponding deallocation must occur for ​pipeline​ and for any nested data structures it contains.
+Frees a given ​*pipeline​* that was created with pipeline_build(). If your pipeline_build() function performs any dynamic memory allocation, this is where the corresponding deallocation must occur for *pipeline​* and for any nested data structures it contains.
 
-You will​ ​not implement​ a main function in your submitted code (that will be part of the next assignment). However, you are encouraged to develop your own unit tests which may have their own main functions.
+You will​ **​not implement**​ a main function in your submitted code (that will be part of the next assignment). However, you are encouraged to develop your own unit tests which may have their own main functions.
 
-### Data Structures We Provide
-_Don’t type these out. We will provide a file that contains these data structures and the function declarations_.
+### <ins>Data Structures We Provide:</ins>
+_Don’t type these out. We will provide a file that contains these data structures and the function declarations._
 
 ![Screenshot 2021-04-19 at 16 17 50](https://user-images.githubusercontent.com/60196280/115298108-071def00-a12b-11eb-93f8-933bc50e84a2.png)
 
 ### Detailed breakdown of a single input​:
-Given ​pipeline_build(“ls|wc -l >counts.txt\n”)​, expect the following parser output:
+Given *​pipeline_build(“ls|wc -l >counts.txt\n”)​*, expect the following parser output:
 
 * This is a valid input, so a non-NULL pipeline pointer is returned.
 * Pipeline commands:
