@@ -1,9 +1,10 @@
 # <ins>Project 2: Threading Library</ins>
+
 The main deliverable for this project is a basic thread system for Linux. In the lectures, we learned that threads are independent units of execution that run (virtually) in parallel in the address space of a single process. As a result, they share the same heap memory, open files (file descriptors), process identifier, etc. Each thread has its own context, which consists of a set of CPU registers and a stack. The thread subsystem provides a set of library functions that applications may use to create, start and terminate threads, and manipulate them in various ways.
 
-The most well-known and widespread standard that specifies a set of interfaces for multi-threaded programming on Unix-style operating systems is called POSIX threads (or pthreads). Note that pthreads merely prescribes the interface of the threading functionality. The implementation of that interface can exist in user-space, take advantage of kernel-mode threads (if provided by the operating system), or mix the two approaches. In this project, you will implement a small subset of the pthread API exclusively in user-mode. In particular, we aim to implement the following three functions from the pthread interface in user mode on Linux (prototypes and explanations partially taken from the respective man pages)
+The most well-known and widespread standard that specifies a set of interfaces for multi-threaded programming on Unix-style operating systems is called POSIX threads (or pthreads). Note that pthreads merely prescribes the interface of the threading functionality. The implementation of that interface can exist in user-space, take advantage of kernel-mode threads (if provided by the operating system), or mix the two approaches. <ins>In this project</ins>, you will implement a small subset of the pthread API exclusively in user-mode. In particular, we aim to implement the following three functions from the pthread interface in user mode on Linux (prototypes and explanations partially taken from the respective man pages)
 
-### Functions to Implement
+### <ins>Functions to Implement:</ins>
 
     int pthread_create( 
         pthread_t *thread,
@@ -11,7 +12,7 @@ The most well-known and widespread standard that specifies a set of interfaces f
         void *(*start_routine) (void *), 
         void *arg);
 
-The *pthread_create()* function creates a new thread within a process. Upon successful completion, *pthread_create()* stores the ID of the created thread in the location referenced by *thread*. In our implementation, the second argument (*attr*) shall always be NULL. The thread is created and executes *start_routine* with arg as its sole argument. If the *start_routine* returns, the effect shall be as if there was an implicit call to *pthread_exit()* using the return value of *start_routine* as the exit status. Note that the thread in which *main()* was originally invoked differs from this. When it returns from the effect shall be as if there was an implicit call to *exit()* using the return value of *main()* as the exit status.
+The *pthread_create()* function creates a new thread within a process. Upon successful completion, *pthread_create()* stores the ID of the created thread in the location referenced by *thread*. In our implementation, the second argument (*attr*) shall always be NULL. The thread is created and executes *start_routine* with arg as its sole argument. If the *start_routine* returns, the effect shall be as if there was an implicit call to *pthread_exit()* using the return value of *start_routine* as the exit status. Note that the thread in which *main()* was originally invoked differs from this. When it returns from *main()*, the effect shall be as if there was an implicit call to *exit()* using the return value of *main()* as the exit status.
 
     void pthread_exit(
         void *value_ptr);
@@ -46,3 +47,36 @@ The *pthread_self()* function shall return the thread ID of the calling thread. 
     }
 
 Additionally, see the given *tests/busy_threads.c*. It is an <ins>incomplete test case</ins> (it may still pass when your code is broken). See its comments for suggested improvements.
+
+### <ins>Some Hints:</ins>
+
+1. You will probably need to use a data structure that can store information about the state of the thread (its set of registers), its stack (e.g., a pointer to the thread's stack area), and status of the thread (whether it is running, ready to run, or has exited). This data structure is often referred to as a *thread control block* (TCB). This is the same concept as Process Control Blocks (PCB), used to manage multiple processes. As you may need to accommodate multiple threads at the same time (you can assume a maximum of 128 threads can be created), the thread control blocks should be stored in a list or a table (array).
+
+2. You should create a helper function that initializes your thread subsystem when the application calls *pthread_create()* for the first time. Before the call to the helper function, there is only one thread running (the main program).
+
+3. Be sure to *#include <pthread.h>* in your program. That header provides declarations for the functions you are required to define. That is the header our tests will compile against.
+
+4. The process of picking another thread is called scheduling. You may cycle through the available threads in a round robin fashion, giving an equal, fair share to each thread.
+
+5. In order to switch between threads, the currently executing thread needs to call the *setjmp()* library function. *setjmp* will save the current state of the thread into a *jmp_buf* structure. Then your thread subsystem can pick another thread, use *longjump()* function along with saved *jmp_buf* to restore to a previously saved state and resume the execution of the new thread.
+    * Think about how often you want the thread of a program to call *setjump* (and thus, give up control of the CPU). Application developers will not do it for you. To solve this issue, you should employ signals and alarms. We can use the *ualarm* or the *setitimer* function to set up a periodic timer that sends a *SIGALRM* signal every X milliseconds (assume that X=50ms for this project). Whenever the alarm goes off, the operating system will invoke the signal handler for *SIGALRM*. So, you can install your own custom signal handler that performs the scheduling (switching between threads) for you. To install this signal handler, you should use *sigaction*
+    with the *SA_NODEFER* flag. Otherwise (e.g., when using the deprecated *signal* function), alarms are automatically blocked while you are running the signal handler. 
+
+    * We **require** that your thread system supports thread preemption and switches
+    between multiple threads that are ready. It is **not okay** to run each individual
+    thread to completion before giving the next one a chance to execute.
+
+    * To create a new thread, the system has to properly initialize the TCB for the new
+    thread: create a new thread ID, allocate a new stack (*malloc* can come in handy) of 32,767 byte size and initialize the thread's state so that it “resumes” execution from the start function that is given as argument to the *pthread_create* function. For this, we could use *setjmp* to save the state of the current thread in a *jmp_buf*, and then, modify this *jmp_buf* in two important ways. First, we want to change the program counter (the RIP) to point to the *start_thunk* function we provide in *ec440threads.h*. Second, we want the stack pointer (the RSP) to point to the top of our newly allocated stack. *start_thunk* is a helper function that moves the value stored in R13 to RDI (why? remember the AMD64 calling convention) and then jumps to whatever address is stored in R12. Hence, for *start_thunk* to work we should store the value of _*arg_ in R13 and the address of *start_func* in R12 (note that both R12 and R13 are members of *jmp_buf*)
+
+    * To modify the *jmp_buf* directly, we have to first understand that it is a very operating system and processor family-specific data structure that is typically not modified directly. libc defines the following constants as the eight integer elements of this structure:
+
+            #define JB_RBX 0
+            #define JB_RBP 1 
+            #define JB_R12 2 
+            #define JB_R13 3 
+            #define JB_R14 4 
+            #define JB_R15 5 
+            #define JB_RSP 6 
+            #define JB_PC 7 
+    

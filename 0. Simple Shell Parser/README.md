@@ -1,4 +1,5 @@
 # <ins>Project 0: Simple Shell Parser</ins>
+
 The goal of this project is to implement a command parser for a simple shell.
 
 ### <ins>Parsing Shell Commands: </ins>
