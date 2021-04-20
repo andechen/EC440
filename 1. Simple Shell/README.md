@@ -70,5 +70,5 @@ You may find it easier to automate your own tests with the following pattern:
 
 ### Tests:
 
-//
+![Screenshot 2021-04-19 at 20 50 00](https://user-images.githubusercontent.com/60196280/115321848-b4f0c400-a152-11eb-983f-e2754272f478.png)
 
