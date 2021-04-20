@@ -11,7 +11,6 @@
 #define RED_IN "<"
 #define RED_OUT ">"
 
-//Function to search for a character in the command line
 bool findChars(char* line, char* chars){
 	if(strstr(line, chars)){
 		return true;
@@ -21,7 +20,6 @@ bool findChars(char* line, char* chars){
 
 }
 
-//Fuction to delete any occurences of a character/word in the command line
 char* deleteWords(char* s, char* oldWord, char* newWord){
 	char* result;
 	int i = 0, c = 0, newWordLength = strlen(newWord), oldWordLength = strlen(oldWord);
@@ -50,7 +48,6 @@ char* deleteWords(char* s, char* oldWord, char* newWord){
 
 }
 
-//Initialising a pipeline_command struct
 struct pipeline_command *pipeline_command_alloc(){
 	struct pipeline_command *pipeline_c = malloc(sizeof(struct pipeline_command));
 
@@ -65,7 +62,6 @@ struct pipeline_command *pipeline_command_alloc(){
 	return pipeline_c;
 }
 
-//Initialising a pipeline struct
 struct pipeline* pipeline_alloc(){
 	struct pipeline_command *pipeline_c = pipeline_command_alloc();
 	struct pipeline *pipeline = malloc(sizeof(struct pipeline));
@@ -76,7 +72,6 @@ struct pipeline* pipeline_alloc(){
 	return pipeline;
 }
 
-//Linking the relevant commands with members of the pipeline_command struct
 struct pipeline_command* p_command_link(char* cline, struct pipeline_command* p_command){
 	int pos = 0;
 	
@@ -118,7 +113,6 @@ struct pipeline_command* p_command_link(char* cline, struct pipeline_command* p_
 	return p_command;
 }
 
-//Linking the relevant commands with members of the pipeline struct and linking the pipelines
 void pipelines(char* pipe_tokens, struct pipeline *pipe){
 	struct pipeline_command *last = pipeline_command_alloc();
 
@@ -138,7 +132,6 @@ void pipelines(char* pipe_tokens, struct pipeline *pipe){
 	return;
 }
 
-//Building the pipeline
 struct pipeline *pipeline_build(const char *command_line)
 {
 	struct pipeline* pipeline_v = pipeline_alloc();
@@ -166,7 +159,6 @@ struct pipeline *pipeline_build(const char *command_line)
 	//return NULL;
 }
 
-//Freeing the allocated memory of the structs
 void pipeline_free(struct pipeline *pipeline)
 {
 	struct pipeline_command *current_command = pipeline_command_alloc();

@@ -67,3 +67,8 @@ When the user types Ctrl-D (pressing the D button while holding control), the sh
 You may find it easier to automate your own tests with the following pattern:
     
     echo 'ls' | ./myshell
+
+### Tests:
+
+//
+
