@@ -289,9 +289,9 @@ int fs_open(const char *name){
             
             return fildes;
         }
-        else if(i == MAX_NUM_OF_FILES - 1){
-            return -1;
-        }
+        // else if(i == MAX_NUM_OF_FILES - 1){
+        //     return -1;
+        // }
     }
 
     return -1;
@@ -586,7 +586,6 @@ int fs_lseek(int fildes, off_t offset){
             }
 
             fd_array[fildes].offset = offset;
-
             return 0;
         }
     }
