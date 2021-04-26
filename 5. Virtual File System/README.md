@@ -9,9 +9,9 @@ To make things easier, your file system does not have to support a directory hie
 
 A constraint on your solution is that you are required to implement your filesystem using inode data structures.
 
-## <ins>Required Functions to Implement</ins>
+## <ins>Functions to Implement<:/ins>
 
-### <ins>Management Routines</ins>
+### <ins>Management Routines:</ins>
 To manage your file system, you have to provide the following three functions:
 
     int make_fs(const char *disk_name);
@@ -28,7 +28,7 @@ This function unmounts your file system from a virtual disk with name *disk_name
 
 It is important to observe that your file system must provide persistent storage. That is, assume that you have created a file system on a virtual disk and mounted it. Then, you create a few files and write some data to them. Finally, you unmount the file system. At this point, all data must be written onto the virtual disk. Another program that mounts the file system at a later point in time must see the previously created files and the data that was written. This means that whenever **umount_fs** is called, all meta-information and file data (that you could temporarily have only in memory; depending on your implementation) must be written out to disk.
 
-### <ins>File System Functions</ins>
+### <ins>File System Functions:</ins>
 In addition to the management routines listed above, you are supposed to implement the following file system functions (which are very similar to the corresponding Linux file system operations). These file system functions require that a file system is mounted.
 
     int fs_open(const char *name);
@@ -93,7 +93,7 @@ In addition to the file-system-related data structures on disk, you also need su
 __fs_lseek__. Note that file descriptors are __not__ stored on disk. They are only meaningful while an application is running and the file system is mounted. Once the file system is unmounted, file descriptors are no longer meaningful (and, hence, should be all closed before a call to umount_fs).
 
 
-## <ins>Tests:</ins>
+## <ins>Test Cases:</ins>
 ![1 - 5](https://user-images.githubusercontent.com/60196280/115783991-8b6ead00-a38b-11eb-80e3-6d3ef789bc29.png)
 ![5 - 8](https://user-images.githubusercontent.com/60196280/115783999-8dd10700-a38b-11eb-958b-973b653a1c92.png)
 ![8 - 9 5](https://user-images.githubusercontent.com/60196280/115784006-90336100-a38b-11eb-88fa-2f280c242321.png)

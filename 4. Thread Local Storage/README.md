@@ -13,7 +13,7 @@ Wouldn’t it be great if you could share data across threads, but also ensure t
 For this assignment, you will implement interfaces to interact with copy-on-write thread-local storage. Your TLS implementation should be agnostic of the current pthread implementation (see the hints section!). That is, it should not rely on the internal state of your threads.c project.
 
 
-### <ins>Functions to Implement</ins>
+### <ins>Functions to Implement:</ins>
 
 You will implement functions to support TLS with CoW.
 
