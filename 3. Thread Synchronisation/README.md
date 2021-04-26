@@ -1,4 +1,6 @@
 # <ins>Project 3: Thread Synchronisation</ins>
+
+### <ins>Project Description:</ins>
 In the previous project, we implemented a part of pthreads that enables creation and execution of multiple threads. Now, we are going to add some more features to that library to support interaction between threads through synchronization.
 
 The main features we need to add are:
@@ -9,10 +11,10 @@ to finish, and to collect a completed thread’s exit status.
 3. Support for mutexes in your threads, which will enable mutual exclusion from critical
 regions of multithreaded code.
 
-### New Functions to Implement
+### <ins>New Functions to Implement:</ins>
 You will implement functions to support thread synchronization through mutexes and barriers. Each of these features includes init/destroy functions and one or more functions that control the synchronisation state.
 
-### Mutex Functions
+### <ins>Mutex Functions:</ins>
 
     int pthread_mutex_init(
         pthread_mutex_t *restrict ​mutex, 
@@ -35,7 +37,7 @@ The ​*pthread_mutex_lock()​* function locks a referenced *​mutex​*. If t
 
 The ​*pthread_mutex_unlock()​* function unlocks a referenced *​mutex*​. If another thread is waiting on this mutex, it will be woken up so that it can continue running. Note that when that happens, the woken thread will finish acquiring the lock. Return 0 on success, or an error code otherwise.
 
-### Barrier Functions
+### <ins>Barrier Functions:</ins>
 
     int pthread_barrier_init(
         pthread_barrier_t *restrict ​barrier,​ 
@@ -56,3 +58,7 @@ The ​*pthread_barrier_destroy()​* function destroys the referenced *​barri
 The ​*pthread_barrier_wait()​* function enters the referenced *barrier*. The calling thread shall not proceed until the required number of threads (from ​*count*​ in *pthread_barrier_init*) have already entered the barrier. Other threads shall be allowed to proceed while this thread is in a barrier (unless they are also blocked for other reasons. Upon exiting a barrier, the order that the threads are awoken is undefined. Exactly one of the returned threads shall return PTHREAD_BARRIER_SERIAL_THREAD (it does not matter which one). The rest of the threads shall return 0.
 
 We also recommend that you create new *​static void lock()​* and ​*static void unlock()* functions. Your lock function should disable the timer that calls your schedule routine, and unlock should re-enable the timer. You can use the ​*sigprocmask​* function to this end (one function using SIG_BLOCK, the other using SIG_UNBLOCK, with a mask on your alarm signal). Use these functions to prevent your scheduler from running when your threading library is internally​ in a critical section (users of your library will use barriers and mutexes for critical sections that are external to your library).
+
+### <ins>Test Cases:</ins>
+
+//
