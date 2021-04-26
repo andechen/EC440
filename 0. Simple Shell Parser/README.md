@@ -1,8 +1,9 @@
 # <ins>Project 0: Simple Shell Parser</ins>
 
+### <ins>Project Description:</ins>
 The goal of this project is to implement a command parser for a simple shell.
 
-### <ins>Parsing Shell Commands: </ins>
+### <ins>Parsing Shell Commands:</ins>
 You will write a program that receives a line of text as an input, and produces the same data in a structured form as output.
 
 A typical approach to solving a parsing problem is to separate it into two parts: lexing and parsing. When lexing, you group parts of your string into a series of ​_tokens_​. When parsing, you search for patterns of tokens that match an expected structure of ​_symbols_.​ You aren’t required to strictly follow that separation of concerns in your implementation, but it may help provide a structured approach to solving this challenge.
@@ -79,7 +80,7 @@ The same output, in visual form is included below:
 
 ![Screenshot 2021-04-19 at 16 18 53](https://user-images.githubusercontent.com/60196280/115298122-0c7b3980-a12b-11eb-9a37-7134ec6772f6.png)
 
-### Some Hints:
+### <ins>Some Hints:</ins>
 * Solve the lexing/tokenizing problem first, then worry about parsing after that. Write a test that sends the provided valid inputs to your lexing function, and verify that it returns the expected series of tokens.
 * Develop your own test cases. While the autograder has some descriptive explanations of what it is trying to do, it will not show you how or why your submitted code is failing a test. A good test suite for this assignment has many test cases. A good test case has some kind of expectations about how a program will react to different inputs and system state changes, and will fail when those expectations are not met.
     * The detailed breakdown in the previous section provides the basis of one test case. Write that in C code so you don’t need to manually very every time you change your parser.
@@ -95,6 +96,6 @@ The same output, in visual form is included below:
     * Use sanitizers when you are building your tests (e.g., ​ASAN​, ​UBSAN​). This is
     easy if you use the given makefile. For example, to use the address sanitizer, build your tests by running ​make checkprogs CFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address​ (you may need to run make clean first, if you already built without sanitizers).
     
-### Tests:
+### <ins>Test Cases:</ins>
 
 ![Screenshot 2021-04-19 at 20 54 22](https://user-images.githubusercontent.com/60196280/115321827-a73b3e80-a152-11eb-8b9c-90a9ab4ea269.png)

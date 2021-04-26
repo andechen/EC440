@@ -28,7 +28,7 @@ In case of errors (e.g., if the input does not follow the rules/assumptions desc
 
 When the user types Ctrl-D (pressing the D button while holding control), the shell must cleanly exit. You may assume that the maximum length of individual tokens (commands and filenames) is 32 characters, and that the maximum length of an input line is 512 characters. Your shell is supposed to collect the exit codes of all processes that it spawns. That is, you are not allowed to leave zombie processes of commands that you start. Your shell should use the ​*fork(2)* system call and the *​​execve(2)* system call (​**HINT​**: you can use its *execvp(3)* library wrapper) to execute commands. It should also use *​​waitpid(2)​​* or *wait(2)* to wait for a program to complete execution (unless the program is in the background). You might also find the documentation for signals (and in particular ​​*SIGCHLD*​​) useful to be able to collect the status of processes that exit when running in the background.
 
-### Example Shell Sessions
+### <ins>Example Shell Sessions:</ins>
 
     root@ea3aca4ec300:/ec440# ./myshell my_shell$whoami
     root
@@ -68,7 +68,7 @@ You may find it easier to automate your own tests with the following pattern:
     
     echo 'ls' | ./myshell
 
-### Tests:
+### <ins>Test Cases:</ins>
 
 ![Screenshot 2021-04-19 at 20 50 00](https://user-images.githubusercontent.com/60196280/115321848-b4f0c400-a152-11eb-983f-e2754272f478.png)
 
