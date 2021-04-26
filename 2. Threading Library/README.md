@@ -130,4 +130,4 @@ Additionally, see the given *tests/busy_threads.c*. It is an <ins>incomplete tes
 
 ### <ins>Test Cases:</ins>
 
-//
+![Screenshot 2021-04-19 at 20 50 31](https://user-images.githubusercontent.com/60196280/116014086-7e5af380-a601-11eb-81e6-2a385e8cbd77.png)
