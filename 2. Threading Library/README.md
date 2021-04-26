@@ -1,5 +1,7 @@
 # <ins>Project 2: Threading Library</ins>
 
+### <ins>Project Description</ins>
+
 The main deliverable for this project is a basic thread system for Linux. In the lectures, we learned that threads are independent units of execution that run (virtually) in parallel in the address space of a single process. As a result, they share the same heap memory, open files (file descriptors), process identifier, etc. Each thread has its own context, which consists of a set of CPU registers and a stack. The thread subsystem provides a set of library functions that applications may use to create, start and terminate threads, and manipulate them in various ways.
 
 The most well-known and widespread standard that specifies a set of interfaces for multi-threaded programming on Unix-style operating systems is called POSIX threads (or pthreads). Note that pthreads merely prescribes the interface of the threading functionality. The implementation of that interface can exist in user-space, take advantage of kernel-mode threads (if provided by the operating system), or mix the two approaches. <ins>In this project</ins>, you will implement a small subset of the pthread API exclusively in user-mode. In particular, we aim to implement the following three functions from the pthread interface in user mode on Linux (prototypes and explanations partially taken from the respective man pages)
@@ -23,7 +25,7 @@ The *pthread_exit()* function terminates the calling thread. In our current impl
 
 The *pthread_self()* function shall return the thread ID of the calling thread. For more details about error handling, please refer to the respective man pages.
 
-### Example Library Usage
+### <ins>Example Library Usage:</ins>
     
     static void* my_thread(void* my_arg) { 
         pthread_t my_tid = pthread_self(); // Do something in this thread
@@ -80,3 +82,48 @@ Additionally, see the given *tests/busy_threads.c*. It is an <ins>incomplete tes
             #define JB_RSP 6 
             #define JB_PC 7 
     
+    * We can see that the stack pointer has index 6 and the program counter has index 7 into the *jmp_buf*. This allows us to easily write the new values for RSP and RIP into a *jmp_buf*. Unfortunately, there is a small complication on the Linux systems in the student/grading environment. These machines are equipped with a libc that includes a security feature to protect the addresses stored in jump buffers. This feature "mangles" a pointer before saving it in a *jmp_buf*. To convince yourself of this, generate a *jmp_buf* while stepping through the program with a debugger, and print the contents in the *jmp_buf*. You will see that many register values are exactly as in the debugger, but not RIP and RSP. Thus, we also have to mangle our new stack pointer and program counter before we can write it into a jump buffer, otherwise decryption (and subsequent uses) will fail. *long_jmp* will automatically decrypt these values, so it is imperative that they are properly encrypted/mangled beforehand. To mangle a pointer before writing it into the jump buffer, make use of the following function:
+
+            unsigned long int ptr_mangle(unsigned long int p){ 
+                unsigned long int ret;
+                asm("movq %1, %%rax;\n" 
+                    "xorq %%fs:0x30, %%rax;" 
+                    "rolq $0x11, %%rax;" 
+                    "movq %%rax, %0;"
+                : "=r"(ret) : "r"(p)
+                : "%rax" );
+                return ret; 
+            }
+
+    * Remember that the start routine of every new thread expects a single argument (a void pointer called *arg*). When a new thread is launched, the start routine should run as if it were invoked by a preceding call instruction (but it isn't, we're setting up a “fake” context with the *jmp_buf* and the stack). Hence, we have to basically "simulate'' such a function call to the start routine. To this end, we just have to initialize the new stack for a thread and pass the argument according to the calling convention. Our environment uses the amd64 calling convention, hence the first six arguments are passed in registers. To make this step easier, we provide the *start_thunk* function that behaves as described above. Specifically, whatever value is stored in R13 (_*arg_) when *start_thunk* is called, will be passed on as the first argument to the function referenced in R12 (*start_routine*). For completeness sake, *start_thunk* is defined as:
+
+            void *start_thunk() {
+                asm(“popq %%rbp;\n” //clean up the function prologue
+                    “movq %%r13, %%rdi;\n” //put arg in $rdi 
+                    “pushq %%r12;\n” //push &start_routine
+                    “retq;\n” :
+                    :
+                    : "%rdi"
+                );
+                __builtin_unreachable(); 
+            }
+
+        In addition to the argument, we also need to make sure that the new stack has a correct return address, such as in struct *start_routine*, to return to after completion. Given that the specification requires that *start_routine* invokes upon completion, we can easily achieve this by putting the address of *pthread_exit* on the top of the stack, which will transparently be treated by *start_routine* as the return address. Make sure to adjust the stack pointer (RSP) appropriately.
+
+    * Once your stack is initialized and the (mangled) stack pointer (RSP) and program counter (RIP) are written to the jmp_buf, your new thread is all ready to go, and when the next SIGALRM arrives, it is ready to be scheduled!
+
+    * In your solution you will have to use *ptr_mangle* to store the mangled stack and instruction pointers into the *jmp_buf* structure. If, during development, you want to inspect these values (e.g., to check you actually got a true *jmp_buf*) you can use the following counterpart to the above *ptr_mangle* function (not necessary, just for convenience)
+
+            unsigned long int ptr_demangle(unsigned long int p) { 
+                unsigned long int ret;
+                asm("movq %1, %%rax;\n" 
+                "rorq $0x11, %%rax;" 
+                "xorq %%fs:0x30, %%rax;" 
+                "movq %%rax, %0;"
+                : "=r"(ret) : "r"(p)
+                : "%rax"
+                );
+                return ret; 
+            }
+
+6. Unfortunately, you will **not be able to use valgrind or sanitizers** with this assignment. Those tools are not aware of our jmp_buf modifications to replace the active stack, so they are likely to raise false alarms. Static analysis tools will still be helpful, though. As always, do not ignore compiler warnings! Try running *make static_analysis*!
