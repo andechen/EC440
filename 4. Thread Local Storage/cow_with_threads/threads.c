@@ -1,4 +1,13 @@
 #include "ec440threads.h"
+#include <pthread.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <setjmp.h>
+#include <stdio.h>
+#include <signal.h>
+#include <unistd.h>
+#include <string.h>
+#include <errno.h>
 
 /* You can support more threads. At least support this many. */
 #define MAX_THREADS 128
@@ -171,8 +180,7 @@ void pthread_exit(void *value_ptr){
 
 	// Check if there are any threads that are ready to exit
 	int threads_left = 0;
-	int i;
-	for(i = 0; i < MAX_THREADS; i++){
+	for(int i = 0; i < MAX_THREADS; i++){
 		switch(TCB_Table[i].status){
 			case TS_READY	:
 			case TS_RUNNING	:
@@ -189,7 +197,7 @@ void pthread_exit(void *value_ptr){
 		schedule();
 	}
 
-	for(i = 0; i < MAX_THREADS; i++){
+	for(int i = 0; i < MAX_THREADS; i++){
 		if(TCB_Table[i].status == TS_EXITED){
 			free(TCB_Table[i].stack);
 		}
@@ -201,12 +209,80 @@ pthread_t pthread_self(void){
 	return TID;
 }
 
+
+
 //***************************************Thread Sync***************************************//
+
+// Lock SIGALRM
+static void lock(){
+	sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGALRM);
+    sigprocmask(SIG_BLOCK, &set, NULL);
+}
+
+// Unlock SIGALRM
+static void unlock(){
+	sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGALRM);
+    sigprocmask(SIG_UNBLOCK, &set, NULL);
+}
+
+// Linked list struct
+typedef struct linked_list{
+	pthread_t tid;
+	struct linked_list *next;
+}linked_list;
+
+// Put on the tail of the linked list
+static void insert_tail(linked_list **list, linked_list **tail, pthread_t tid) {
+    linked_list *to_ins = (linked_list *) malloc(sizeof(linked_list));
+
+    to_ins->tid = tid;
+    to_ins->next = NULL;
+
+    if ((*list) == NULL) {
+        (*list) = to_ins;
+        (*tail) = to_ins;
+    } else {
+        list = &((*tail)->next);
+        (*list) = to_ins;
+        (*tail) = to_ins;
+    }
+}
+
+// Get the head of the linked list
+static void get_head(linked_list **list, linked_list **tail, pthread_t *tid) {
+    linked_list *to_del;
+
+    to_del = (*list);
+    if (tid != NULL) {
+        (*tid) = to_del->tid;
+    }
+    (*list) = to_del->next;
+    free(to_del);
+    if ((*list) == NULL) {
+        (*tail) = NULL;
+    }
+}
+
+// Check if the linked list is empty
+static bool is_empty(linked_list *list) {
+    return (list == NULL);
+}
+
+// Mutex struct
+typedef struct{
+	char locked;
+	linked_list *wait_list;
+	linked_list *wait_list_tail;
+}MutexControlBlock;
 
 int pthread_mutex_init(pthread_mutex_t *restrict mutex, const pthread_mutexattr_t *restrict attr){
 	MutexControlBlock *MCB = (MutexControlBlock *) malloc(sizeof(MutexControlBlock));
 
-    MCB->state = UNLOCKED;
+    MCB->locked = 0;
 	MCB->wait_list = NULL;
 	MCB->wait_list_tail = NULL;
 
@@ -217,7 +293,7 @@ int pthread_mutex_init(pthread_mutex_t *restrict mutex, const pthread_mutexattr_
 int pthread_mutex_destroy(pthread_mutex_t *mutex){
 	MutexControlBlock *MCB = (MutexControlBlock *) (mutex->__align);
 	
-	if(MCB->state != LOCKED){
+	if(MCB->locked != 1){
 		free((void *)(mutex->__align));
 		return 0;
 	}
@@ -229,9 +305,10 @@ int pthread_mutex_destroy(pthread_mutex_t *mutex){
 int pthread_mutex_lock(pthread_mutex_t *mutex) {
  	MutexControlBlock *MCB = (MutexControlBlock *) (mutex->__align);
 	
-	if(MCB->state == UNLOCKED){	// Thread grabs the lock
+	if(!MCB->locked){	// Thread grabs the lock
 		lock();
-		MCB->state = LOCKED;
+		MCB->locked = 1;
+
 		unlock();
 		return 0;
 	}
@@ -251,7 +328,9 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex){
 	
 	if(is_empty(MCB->wait_list)){	// No more threads waiting for the mutex
 		lock();
-		MCB->state = UNLOCKED;
+
+		MCB->locked = 0;
+
 		unlock();
 		return 0;
 	}
@@ -259,7 +338,7 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex){
 		lock();
 		pthread_t next_thread;
 		get_head(&MCB->wait_list, &MCB->wait_list_tail, &next_thread);
-		MCB->state = 1;
+		MCB->locked = 1;
 
 		TCB_Table[next_thread].status = TS_READY;
 			
@@ -268,6 +347,15 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex){
 		return 0;
 	}
 }
+
+// Barrier struct
+typedef struct{
+	char init;
+	char flag;
+	pthread_t calling_thread;
+	unsigned count;
+	unsigned left;
+}BarrierControlBlock;
 
 int pthread_barrier_init(pthread_barrier_t *restrict barrier, const pthread_barrierattr_t *restrict attr, unsigned count){
 	if(count == 0){

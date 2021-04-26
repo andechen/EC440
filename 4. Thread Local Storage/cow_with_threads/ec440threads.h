@@ -11,6 +11,8 @@
 #include <string.h>
 #include <errno.h>
 
+#define MAX_THREADS 128
+
 /*
 static unsigned long int ptr_demangle(unsigned long int p)
 {
@@ -89,9 +91,7 @@ static void schedule();
 static void scheduler_init();
 
 // Creating a thread
-int pthread_create(
-	pthread_t *thread, const pthread_attr_t *attr,
-	void *(*start_routine) (void *), void *arg);
+int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine) (void *), void *arg);
 
 // Exit the thread
 void pthread_exit(void *value_ptr);
@@ -101,79 +101,7 @@ pthread_t pthread_self(void);
 
 //***************************************Thread Sync***************************************//
 
-// Lock SIGALRM
-static void lock(){
-	sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGALRM);
-    sigprocmask(SIG_BLOCK, &set, NULL);
-}
-
-// Unlock SIGALRM
-static void unlock(){
-	sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGALRM);
-    sigprocmask(SIG_UNBLOCK, &set, NULL);
-}
-
-// Linked list struct
-typedef struct linked_list{
-	pthread_t tid;
-	struct linked_list *next;
-}linked_list;
-
-// Put on the tail of the linked list
-static void insert_tail(linked_list **list, linked_list **tail, pthread_t tid) {
-    linked_list *to_ins = (linked_list *) malloc(sizeof(linked_list));
-
-    to_ins->tid = tid;
-    to_ins->next = NULL;
-
-    if ((*list) == NULL) {
-        (*list) = to_ins;
-        (*tail) = to_ins;
-    } else {
-        list = &((*tail)->next);
-        (*list) = to_ins;
-        (*tail) = to_ins;
-    }
-}
-
-// Get the head of the linked list
-static void get_head(linked_list **list, linked_list **tail, pthread_t *tid) {
-    linked_list *to_del;
-
-    to_del = (*list);
-    if (tid != NULL) {
-        (*tid) = to_del->tid;
-    }
-    (*list) = to_del->next;
-    free(to_del);
-    if ((*list) == NULL) {
-        (*tail) = NULL;
-    }
-}
-
-// Check if the linked list is empty
-static bool is_empty(linked_list *list) {
-    return (list == NULL);
-}
-
-// State of the mutex
-typedef enum{
-	LOCKED,
-	UNLOCKED
-}mutex_state;
-
-// Mutex struct
-typedef struct{
-	mutex_state state;
-	linked_list *wait_list;
-	linked_list *wait_list_tail;
-}MutexControlBlock;
-
-// Mutex initialiser
+// Mutex constructor
 int pthread_mutex_init(pthread_mutex_t *restrict mutex, const pthread_mutexattr_t *restrict attr);
 
 // Mutex destructor
@@ -185,16 +113,7 @@ int pthread_mutex_lock(pthread_mutex_t *mutex);
 // Unlock the mutex
 int pthread_mutex_unlock(pthread_mutex_t *mutex);
 
-// Barrier struct
-typedef struct{
-	char init;
-	char flag;
-	pthread_t calling_thread;
-	unsigned count;
-	unsigned left;
-}BarrierControlBlock;
-
-// Barrier initialiser
+// Barrier constructor
 int pthread_barrier_init(pthread_barrier_t *restrict barrier, const pthread_barrierattr_t *restrict attr, unsigned count);
 
 // Barrier destructor
