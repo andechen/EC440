@@ -1,11 +1,12 @@
 override CFLAGS := -Wall -Werror -std=gnu99 -O0 -g $(CFLAGS) -I.
 override LDLIBS := -pthread $(LDLIBS)
+# override LDLIBS := $(LDLIBS)
 
-export CFLAGS=-fsanitize=address
-export LDFLAGS=-fsanitize=address
+# export CFLAGS=-fsanitize=address
+# export LDFLAGS=-fsanitize=address
 # export ASAN_OPTIONS=handle_segv=2
 
-# Build the threads.o file
+# Build the tls.o file
 tls.o: tls.c tls.h
 
 # Automatically discover all test files

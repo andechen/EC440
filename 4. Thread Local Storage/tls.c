@@ -32,7 +32,7 @@ typedef struct Item{
     struct Item *next;      // Pointer to the next TLS
 }Item;
 
-Item* Table[HASH];      // TLS table
+Item* Table[HASH];      // TLS hash table with linear probing
 unsigned long int page_size = 0;    // Page size
 pthread_mutex_t mutex;      // Mutex
 
@@ -48,6 +48,7 @@ Item* Find(pthread_t tid){
     if(Table[index] != NULL){
         Item* element = Table[index];
 
+		// Traverse the linked list
 		while(element != NULL){
 			if(element->tid == tid){
 				return element;
@@ -61,9 +62,10 @@ Item* Find(pthread_t tid){
 
 // Inserts an element into the TLS table
 bool Add(Item* newElement){
-    pthread_t key = pthread_self();
-    int index = HashFunction(key);
+    pthread_t tid = pthread_self();
+    int index = HashFunction(tid);
 
+	// Add to the head of a linked list
     if(Table[index] != NULL){
         Item* element = Table[index];
         Table[index] = newElement;
@@ -71,6 +73,7 @@ bool Add(Item* newElement){
 
         return true;
     }
+	// Add a new element
     else{
         Table[index] = newElement;
         Table[index]->next = NULL;
@@ -85,22 +88,21 @@ bool Add(Item* newElement){
 Item* Remove(pthread_t tid){
     int index = HashFunction(tid);
 
+	// Traverse the linked list and return the needed element
     if(Table[index] != NULL){
-        Item* prev = NULL;
+        Item* temp = NULL;
         Item* current = Table[index];
-		Item* next = Table[index]->next;
         
 		while(current != NULL){
 			if(current->tid == tid){
 				break;
 			}
-            prev = current;
-            current = next;
-			next = current->next;
+            temp = current;
+            current = current->next;
 		}
 
-		if(prev != NULL){
-			prev->next = next;
+		if(temp != NULL){
+			temp = current->next;
 		}
 
         return current;
@@ -112,11 +114,11 @@ Item* Remove(pthread_t tid){
 }
 
 // Helper function to handle signals like SIGSEGV and SIGBUS, when they are caused by the TLS
-void tls_handle_page_fault(int sig, siginfo_t *si, void *context){
+static void tls_handle_page_fault(int sig, siginfo_t *si, void *context){
     unsigned long int p_fault = ((unsigned long int) si->si_addr & ~(page_size - 1));
 
+	// Traverse the pages using brute force
     for(int i = 0; i < HASH; i++){
-        
         if(Table[i]){
             Item* element = Table[i];
         
@@ -142,7 +144,7 @@ void tls_handle_page_fault(int sig, siginfo_t *si, void *context){
 }
 
 // Helper function to initialise the needed parameters
-void tls_init(){
+static void tls_init(){
     struct sigaction sigact;
     
     // Handle page faults (SIGSEGV, SIGBUS)
@@ -178,7 +180,8 @@ int tls_create(unsigned int size){
 	// Creating a TLS for this thread
 	ThreadLocalStorage* TLS = (ThreadLocalStorage*) malloc(sizeof(ThreadLocalStorage));
 	TLS->size = size;
-	TLS->page_num = size / page_size + (size % page_size != 0);	// Ceiling the page_num
+	// Ceiling the page_num
+	TLS->page_num = size / page_size + (size % page_size != 0);
 
 	// Creating the pages array and then creating each page
 	TLS->pages = (Page**) calloc(TLS->page_num, sizeof(Page*));
@@ -188,6 +191,7 @@ int tls_create(unsigned int size){
 		// Use mmap to map the pages to a specific place in memory
 		page->address = (unsigned long int) mmap(0, page_size, PROT_NONE, (MAP_ANON | MAP_PRIVATE), 0, 0);
 		
+		// Throw an error if the mapping failed
 		if(page->address == (unsigned long int) MAP_FAILED){
 			return -1;
 		}
@@ -259,14 +263,11 @@ static void tls_unprotect(Page* p, const int protect){
 }
 
 int tls_write(unsigned int offset, unsigned int length, const char *buffer){
-	pthread_mutex_lock(&mutex);
-
 	pthread_t TID = pthread_self();
 	Item* element = Find(TID);
 
 	// Throw an error if the TLS for a particular thread does not exist
 	if(element == NULL){
-		pthread_mutex_unlock(&mutex);
 		return -1;
 	}
 		
@@ -274,11 +275,12 @@ int tls_write(unsigned int offset, unsigned int length, const char *buffer){
 
 	// Throw an error if the function call wants to read more memory than the TLS can hold
 	if((offset + length) > TLS->size){
-		pthread_mutex_unlock(&mutex);
 		return -1;
 	}
 	
-	// pthread_mutex_lock(&mutex);
+	// Lock the mutex, to avoid race conditions
+	pthread_mutex_lock(&mutex);
+
 	// Unprotect the pages in the TLS, so that they are available for writting
 	for(int i = 0; i < TLS->page_num; i++){
 		tls_unprotect(TLS->pages[i], PROT_WRITE);
@@ -319,32 +321,31 @@ int tls_write(unsigned int offset, unsigned int length, const char *buffer){
 		tls_protect(TLS->pages[i]);
 	}
 
+	// Unlock the mutex, to continue running the programme normally
 	pthread_mutex_unlock(&mutex);
 
 	return 0;
 }
 
 int tls_read(unsigned int offset, unsigned int length, char *buffer){
-	pthread_mutex_lock(&mutex);
-
 	pthread_t TID = pthread_self();
 	Item* element = Find(TID);
 
 	// Throw an error if the TLS for a particular thread does not exist
 	if(element == NULL){
-		pthread_mutex_unlock(&mutex);
 		return -1;
 	}
-	
+
 	ThreadLocalStorage* TLS = element->tls;
 	
 	// Throw an error if the function call wants to read more memory than the TLS can hold
 	if((offset + length) > TLS->size){
-		pthread_mutex_unlock(&mutex);
 		return -1;
 	}
 
-	
+	// Lock the mutex, to avoid race conditions
+	pthread_mutex_lock(&mutex);
+
 	// Unprotect the pages in the TLS, so that they are available for reading
 	for(int i = 0; i < TLS->page_num; i++){
 		tls_unprotect(TLS->pages[i], PROT_READ);
@@ -368,6 +369,7 @@ int tls_read(unsigned int offset, unsigned int length, char *buffer){
 		tls_protect(TLS->pages[i]);
 	}
 
+	// Unlock the mutex, to continue running the programme normally
 	pthread_mutex_unlock(&mutex);
 
 	return 0;
@@ -400,7 +402,6 @@ int tls_clone(pthread_t tid){
 	clone_element->tls->pages = (Page**) calloc(clone_element->tls->page_num, sizeof(Page*));
 	
 	for(int i = 0; i < clone_element->tls->page_num; i++){
-		// (targetTLS->pages[i]->ref_count)++;
 		clone_element->tls->pages[i] = targetTLS->pages[i];
 		(clone_element->tls->pages[i]->ref_count)++;
 	}

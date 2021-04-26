@@ -1,6 +1,7 @@
 #ifndef TLS_H_
 #define TLS_H_
 #include <pthread.h>
+// #include "ec440threads.h"
 #include <stdbool.h>
 #include <signal.h>
 #include <sys/mman.h>
@@ -9,8 +10,12 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
-#define HASH 23
+// Hash function for the Table
+#define HASH 23 
 
 // Creates a local storage area (TLS) of a given size for the current thread
 int tls_create(unsigned int size);
