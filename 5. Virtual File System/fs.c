@@ -77,14 +77,14 @@ int make_fs(const char *disk_name){
         return -1;
     }
     
-    // Initializing the Super block and the relative offsets
+    // Initialising the Super block and the relative offsets
     Superblock sb;
 
     // Directory offset and length
     sb.d_offset = 1;
     sb.d_length = (sizeof(Directory_Entry) * MAX_NUM_OF_FILES) / BLOCK_SIZE + 1;
     
-    // Free map offset and length
+    // Bitmap offset and length
     sb.used_block_bitmap_offset = sb.d_length + sb.d_offset;
     sb.used_block_bitmap_count = (sizeof(char) * DISK_BLOCKS) / BLOCK_SIZE;
 
@@ -104,7 +104,7 @@ int make_fs(const char *disk_name){
         return -1;
     }
 
-    // Initializing the directory
+    // Initialising the directory
     Directory_Entry empty_dir;
     empty_dir.used = false;
     empty_dir.name[0] = '\0';
@@ -120,7 +120,7 @@ int make_fs(const char *disk_name){
         return -1;
     }
 
-    // Initializing the Inode Table
+    // Initialising the Inode Table
     Inode empty_inode;
     empty_inode.next_direct_offset = -2;
     
@@ -289,9 +289,6 @@ int fs_open(const char *name){
             
             return fildes;
         }
-        // else if(i == MAX_NUM_OF_FILES - 1){
-        //     return -1;
-        // }
     }
 
     return -1;
@@ -507,8 +504,8 @@ int fs_write(int fildes, void *buf, size_t nbyte){
     inode = Directory[index].inode_number;
     
     // Reading the whole file before write
-    for(int i = 0; i < (Directory[index].size - 1) / BLOCK_SIZE + 1; i++){
-        if(block_read(inode, buffer + i * BLOCK_SIZE) == -1){
+    for(int read = 0; read < (Directory[index].size - 1) / BLOCK_SIZE + 1; read++){
+        if(block_read(inode, buffer + read * BLOCK_SIZE) == -1){
             return -1;
         }
         inode = Table[inode].next_direct_offset;
@@ -521,8 +518,8 @@ int fs_write(int fildes, void *buf, size_t nbyte){
     memcpy((void*) (buffer + fd_array[fildes].offset), buf, nbyte);
     
     // Finally writing the new file
-    for(int i = 0; i < (Directory[index].size - 1) / BLOCK_SIZE + 1; i++){
-        if(block_write(inode, buffer + i * BLOCK_SIZE) == -1){
+    for(int write = 0; write < (Directory[index].size - 1) / BLOCK_SIZE + 1; write++){
+        if(block_write(inode, buffer + write * BLOCK_SIZE) == -1){
             return -1;
         }
         inode = Table[inode].next_direct_offset;
