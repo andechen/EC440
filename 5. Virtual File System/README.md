@@ -9,7 +9,7 @@ To make things easier, your file system does not have to support a directory hie
 
 A constraint on your solution is that you are required to implement your filesystem using inode data structures.
 
-## <ins>Functions to Implement</ins>
+## <ins>Functions to Implement:</ins>
 
 ### <ins>Management Routines:</ins>
 To manage your file system, you have to provide the following three functions:
