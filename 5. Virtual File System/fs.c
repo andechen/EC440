@@ -77,7 +77,7 @@ int make_fs(const char *disk_name){
         return -1;
     }
     
-    // Initialising the Super block and the relative offsets
+    // Initialising the Super Block and the relative offsets
     Superblock sb;
 
     // Directory offset and length
@@ -135,7 +135,7 @@ int make_fs(const char *disk_name){
         }
     }
 
-    // Initialising the bitmap
+    // Initialising the Bitmap
     char empty_bitmap = '0';
     for(int i = 0; i < sb.used_block_bitmap_count; i++){
         memcpy((void*) (buffer + i * sizeof(char)), (void*) &empty_bitmap, sizeof(char));
@@ -172,7 +172,7 @@ int mount_fs(const char *disk_name){
     char* buffer = calloc(1, BLOCK_SIZE);
     super = (Superblock*) malloc(sizeof(Superblock));
 
-    // Read the Super block info
+    // Read the Super Block info
     if(block_read(0, buffer) == -1){
         return -1;
     }
@@ -194,7 +194,7 @@ int mount_fs(const char *disk_name){
         memcpy((void*) (Table + i * BLOCK_SIZE / sizeof(Inode)), (void*) buffer, BLOCK_SIZE);
     }
     
-    // Reading the bitmap
+    // Reading the Bitmap
     used_block_bitmap = (char*) malloc(DISK_BLOCKS);
     if(block_read(super->used_block_bitmap_offset, buffer) == -1){
         return -1;
@@ -226,7 +226,7 @@ int umount_fs(const char *disk_name){
     // Create a buffer for writing
     char* buffer = calloc(1, BLOCK_SIZE);
 
-    // Writing the Super block info
+    // Writing the Super Block info
     memcpy((void*) buffer, (void*) super, sizeof(Superblock));
     if(block_write(0, buffer) == -1){
         return -1;
@@ -238,7 +238,7 @@ int umount_fs(const char *disk_name){
         return -1;
     }
 
-    // Writing the Inode table info
+    // Writing the Inode Table info
     for(int i = 0; i < super->inode_metadata_blocks; i++){
         memcpy((void*) buffer, (void*) (Table + i * BLOCK_SIZE / sizeof(Inode)), BLOCK_SIZE);
         if(block_write(super->inode_metadata_offset + i, buffer) == -1){
@@ -323,7 +323,7 @@ int fs_create(const char *name){
     }
 
     int count = 0;
-    // Check many files exist
+    // Check how many files exist
     for(int i = 0; i < MAX_NUM_OF_FILES; i++){
         if(Directory[i].used){
             if(strcmp(name, Directory[i].name) == 0){
@@ -340,9 +340,9 @@ int fs_create(const char *name){
     // Find a free entry in the bitmap
     for(inode = super->data_offset; inode < DISK_BLOCKS; inode++){
         if(used_block_bitmap[inode] == 0){
-            // Mark as taken
+            // Mark as used
             used_block_bitmap[inode] = 1;
-            // Fill the Inode table
+            // Fill the Inode Table
             Table[inode].next_direct_offset = -1;
             Table[inode].type = 1;
         
@@ -381,7 +381,7 @@ int fs_delete(const char *name){
 
     int inode = Directory[index].inode_number, prev_inode;
 
-    // Iterating through the Inode table and freeing these entries
+    // Iterating through the Inode Table and freeing these entries
     while(Table[inode].next_direct_offset != -1){
         used_block_bitmap[inode] = 0;
         prev_inode = inode;
@@ -488,7 +488,7 @@ int fs_write(int fildes, void *buf, size_t nbyte){
             }
         }
 
-        // Traverse through the inode array for this file
+        // Traverse through the Inode Table for this file
         inode = Table[inode].next_direct_offset;
     }
 
@@ -532,6 +532,7 @@ int fs_write(int fildes, void *buf, size_t nbyte){
 }
 
 int fs_get_filesize(int fildes){
+    // Find the directory entry and return its size
     for(int i = 0; i < MAX_NUM_OF_FILES; i++){
         if(Directory[i].used && Directory[i].inode_number == fd_array[fildes].inode_number){
             return Directory[i].size;
